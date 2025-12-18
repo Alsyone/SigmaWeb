@@ -145,11 +145,11 @@
     <div class="header" id="mainHeader">
         <div class="menu-row">
             <label>Symbol:</label>
-            <div class="symbol-btn active" data-symbol="BTCUSDT">в‚ї BTC</div>
-            <div class="symbol-btn" data-symbol="ETHUSDT">Оћ ETH</div>
-            <div class="symbol-btn" data-symbol="BNBUSDT">рџ”¶ BNB</div>
-            <div class="symbol-btn" data-symbol="ADAUSDT">рџ”· ADA</div>
-            <div class="symbol-btn" data-symbol="SOLUSDT">в—Ћ SOL</div>
+            <div class="symbol-btn active" data-symbol="BTCUSDT">₿ BTC</div>
+            <div class="symbol-btn" data-symbol="ETHUSDT">Ξ ETH</div>
+            <div class="symbol-btn" data-symbol="BNBUSDT">🔶 BNB</div>
+            <div class="symbol-btn" data-symbol="ADAUSDT">🔷 ADA</div>
+            <div class="symbol-btn" data-symbol="SOLUSDT">◎ SOL</div>
         </div>
         <div class="menu-row">
             <label>Interval:</label>
@@ -186,8 +186,8 @@
         </div>
     </div>
     <div class="chart-title" id="chartTitle">
-        <span id="chartTitleText">вЂ”</span>
-        <div class="toggle-menu-btn" id="toggleMenuBtn">в‰Ў</div>
+        <span id="chartTitleText">—</span>
+        <div class="toggle-menu-btn" id="toggleMenuBtn">≡</div>
     </div>
     <div class="container">
         <div class="chart-container">
@@ -235,11 +235,11 @@
         toggleMenuBtn.addEventListener('click', () => {
             menuCollapsed = !menuCollapsed;
             mainHeader.classList.toggle('collapsed', menuCollapsed);
-            toggleMenuBtn.textContent = menuCollapsed ? 'в‰Ў' : 'Г—';
+            toggleMenuBtn.textContent = menuCollapsed ? '≡' : '×';
             setTimeout(updateDisplay, 150);
         });
 
-        // ... РѕСЃС‚Р°Р»СЊРЅРѕР№ РєРѕРґ Р±РµР· РёР·РјРµРЅРµРЅРёР№ РґРѕ drawAdaptiveTimeGrid ...
+        // ... остальной код без изменений до drawAdaptiveTimeGrid ...
 
         const Database = {
             dbName: 'sigma_candles_v11',
@@ -611,56 +611,56 @@
             ctx.fillText(`$${price.toLocaleString()}`, w - marginX + (w > 500 ? 10 : 2), y - 2);
         }
 
-        // === РРЎРџР РђР’Р›Р•РќРћ: 1d в†’ РЅРµРґРµР»Рё ===
+        // === ИСПРАВЛЕНО: 1d → недели ===
         function drawAdaptiveTimeGrid(data, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH) {
             const interval = config.interval;
             let majorStepMs = 0;
             let formatLabel = (ts) => '';
 
             if (['1m', '2m'].includes(interval)) {
-                // 1m, 2m в†’ РїРѕ С‡Р°СЃР°Рј
+                // 1m, 2m → по часам
                 majorStepMs = 3600 * 1000;
                 formatLabel = (ts) => {
                     const d = new Date(ts);
                     return `${d.getHours()}:00`;
                 };
             } else if (['3m', '5m'].includes(interval)) {
-                // 3m, 5m в†’ РїРѕ С‡Р°СЃР°Рј
+                // 3m, 5m → по часам
                 majorStepMs = 3600 * 1000;
                 formatLabel = (ts) => {
                     const d = new Date(ts);
                     return `${d.getHours()}:00`;
                 };
             } else if (['15m', '30m', '1h'].includes(interval)) {
-                // 15mвЂ“1h в†’ РїРѕ СЃСѓС‚РєР°Рј
+                // 15m–1h → по суткам
                 majorStepMs = 86400 * 1000;
                 formatLabel = (ts) => {
                     const d = new Date(ts);
                     return `${d.getDate()}`;
                 };
             } else if (['2h', '4h', '6h', '8h', '12h'].includes(interval)) {
-                // 2hвЂ“12h в†’ РїРѕ СЃСѓС‚РєР°Рј
+                // 2h–12h → по суткам
                 majorStepMs = 86400 * 1000;
                 formatLabel = (ts) => {
                     const d = new Date(ts);
                     return `${d.getDate()}`;
                 };
             } else if (['1d', '2d', '3d'].includes(interval)) {
-                // 1d, 2d, 3d в†’ РїРѕ РЅРµРґРµР»СЏРј
+                // 1d, 2d, 3d → по неделям
                 majorStepMs = 7 * 86400 * 1000;
                 formatLabel = (ts) => {
                     const d = new Date(ts);
                     return `${d.getMonth()+1}/${d.getDate()}`;
                 };
             } else if (interval === '1w') {
-                // 1w в†’ РїРѕ РјРµСЃСЏС†Р°Рј
+                // 1w → по месяцам
                 majorStepMs = 30.44 * 86400 * 1000;
                 formatLabel = (ts) => {
                     const d = new Date(ts);
                     return `${d.getMonth()+1}/${String(d.getFullYear()).slice(-2)}`;
                 };
             } else if (interval === '1M') {
-                // 1M в†’ РїРѕ РіРѕРґР°Рј
+                // 1M → по годам
                 majorStepMs = 365.25 * 86400 * 1000;
                 formatLabel = (ts) => {
                     const d = new Date(ts);
@@ -746,9 +746,9 @@
                 { color: '#FF00FF', text: 'Strong +' },
                 { color: '#FF0000', text: 'Moderate +' },
                 { color: '#FFFF00', text: 'Weak +' },
-                { color: '#00FFFF', text: 'Strong вЂ“' },
-                { color: '#0000FF', text: 'Moderate вЂ“' },
-                { color: '#FFFFFF', text: 'Weak вЂ“' }
+                { color: '#00FFFF', text: 'Strong –' },
+                { color: '#0000FF', text: 'Moderate –' },
+                { color: '#FFFFFF', text: 'Weak –' }
             ];
             const startX = 10;
             const itemH = 20;
