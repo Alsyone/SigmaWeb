@@ -807,16 +807,18 @@
             return res;
         }
 
-        function updateDisplay() {
-            const container = canvas.parentElement;
-            const width = container.clientWidth;
-            const height = container.clientHeight;
-            if (width > 0 && height > 0) {
-                canvas.width = width;
-                canvas.height = height;
-                drawChart();
-            }
-        }
+		function updateDisplay() {
+			const headerH = menuCollapsed ? 0 : mainHeader.offsetHeight;
+			const titleH = document.getElementById('chartTitle').offsetHeight;
+			const statusH = document.querySelector('.status-bar').offsetHeight;
+			const footerH = footerCollapsed ? 0 : mainFooter.offsetHeight;
+
+			const availableHeight = window.innerHeight - headerH - titleH - statusH - footerH;
+			canvas.height = Math.max(100, availableHeight);
+			canvas.width = canvas.parentElement.clientWidth;
+
+			drawChart();
+		}
 
         function drawChart() {
             if (!fullCandleData.length) return;
