@@ -123,6 +123,7 @@
             background: #3a3a5a;
         }
         .chart-wrapper {
+			min-height: 0; /* важно для корректного сжатия */
             position: relative;
             flex: 1;
             overflow: hidden;
@@ -211,10 +212,6 @@
         #popupApplyBtn { background-color: #4CAF50; color: white; }
         #popupResetBtn { background-color: #f44336; color: white; }
         #popupCloseBtn { background-color: #555; color: white; }
-        @media (max-width: 600px) {
-            .chart-wrapper {
-                height: calc(100% - 44px - 30px - 25px);
-            }
         }
     </style>
 </head>
