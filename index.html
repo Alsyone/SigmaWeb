@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sigma TA Web - Cryptocurrency Analysis</title>
+    <title>Sigma TA Web</title>
     <style>
         * {
             margin: 0;
@@ -47,6 +47,15 @@
         .header button:hover {
             background-color: #45a049;
         }
+        .chart-title {
+            background-color: #161625;
+            padding: 8px 20px;
+            font-size: 20px;
+            font-weight: bold;
+            display: flex;
+            justify-content: flex-start; /* ← выравнивание слева */
+            border-bottom: 1px solid #333;
+        }
         .container {
             display: flex;
             flex: 1;
@@ -83,12 +92,22 @@
         <label>Interval:</label>
         <select id="intervalSelect">
             <option value="1m">1m</option>
+            <option value="3m">3m</option>
             <option value="5m">5m</option>
             <option value="15m">15m</option>
             <option value="30m">30m</option>
-            <option value="1h" selected>1h</option>
+            <option value="1h">1h</option>
+            <option value="2h">2h</option>
+            <option value="3h">3h</option>
             <option value="4h">4h</option>
+            <option value="6h">6h</option>
+            <option value="8h">8h</option>
+            <option value="12h">12h</option>
             <option value="1d">1d</option>
+            <option value="2d">2d</option>
+            <option value="3d">3d</option>
+            <option value="1w">1w</option>
+            <option value="1M">1M</option>
         </select>
         <label>Analysis:</label>
         <input type="number" id="analysisLimit" value="10000" min="500" max="20000" step="500" style="width: 75px;">
@@ -102,14 +121,15 @@
         <input type="number" id="updateInterval" value="5000" min="1000" max="300000" step="1000" style="width: 75px;">
         <button id="applyBtn">Apply</button>
     </div>
+    <div class="chart-title" id="chartTitle">—</div>
     <div class="container">
         <div class="chart-container">
             <canvas id="chartCanvas"></canvas>
         </div>
     </div>
     <div class="status-bar">
-        <div id="currentPrice">Current Price: N/A</div>
         <div id="lastUpdated">Last Updated: --:--:--</div>
+        <div><small>Use +/- keys or Shift+Wheel to zoom candles</small></div>
     </div>
     <script>
         const config = {
@@ -123,13 +143,14 @@
             markerOffsetPx: 10
         };
 
-        let fullCandleData = []; // полный набор для анализа
+        let fullCandleData = [];
         let markers = [];
         let currentPrice = null;
         let lastUpdateTime = null;
 
         const canvas = document.getElementById('chartCanvas');
         const ctx = canvas.getContext('2d');
+        const chartTitleDiv = document.getElementById('chartTitle');
 
         const symbolSelect = document.getElementById('symbolSelect');
         const intervalSelect = document.getElementById('intervalSelect');
@@ -139,11 +160,10 @@
         const derivWindowInput = document.getElementById('derivWindow');
         const updateIntervalInput = document.getElementById('updateInterval');
         const applyBtn = document.getElementById('applyBtn');
-        const currentPriceDiv = document.getElementById('currentPrice');
         const lastUpdatedDiv = document.getElementById('lastUpdated');
 
         const Database = {
-            dbName: 'sigma_candles_v2',
+            dbName: 'sigma_candles_v5',
             initDB: () => {
                 if (!localStorage.getItem(this.dbName)) {
                     localStorage.setItem(this.dbName, JSON.stringify({}));
@@ -153,7 +173,7 @@
                 try {
                     const db = JSON.parse(localStorage.getItem(this.dbName)) || {};
                     const key = `${symbol}_${interval}`;
-                    db[key] = candles.slice(-20000); // keep up to 20k
+                    db[key] = candles.slice(-20000);
                     localStorage.setItem(this.dbName, JSON.stringify(db));
                 } catch (e) {
                     console.error("DB save error:", e);
@@ -174,7 +194,7 @@
         Database.initDB();
 
         const SettingsManager = {
-            key: 'sigma_ta_settings_v2',
+            key: 'sigma_ta_settings_v5',
             load: () => {
                 try {
                     return JSON.parse(localStorage.getItem(this.key)) || config;
@@ -197,6 +217,8 @@
             loadData();
             setInterval(loadData, config.updateIntervalMs);
             window.addEventListener('resize', updateDisplay);
+            window.addEventListener('keydown', handleKeyDown);
+            canvas.addEventListener('wheel', handleWheel, { passive: false });
             updateDisplay();
         }
 
@@ -231,6 +253,33 @@
             loadData();
         }
 
+        function adjustDisplayLimit(delta) {
+            let newVal = config.displayLimit + delta;
+            newVal = Math.max(10, Math.min(1000, newVal));
+            if (newVal !== config.displayLimit) {
+                config.displayLimit = newVal;
+                displayLimitInput.value = newVal;
+                updateDisplay();
+            }
+        }
+
+        function handleKeyDown(e) {
+            if (e.key === '+' || e.key === '=' || e.key === 'Add') {
+                adjustDisplayLimit(-10);
+                e.preventDefault();
+            } else if (e.key === '-' || e.key === '_' || e.key === 'Subtract') {
+                adjustDisplayLimit(10);
+                e.preventDefault();
+            }
+        }
+
+        function handleWheel(e) {
+            if (!e.shiftKey) return;
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? 10 : -10;
+            adjustDisplayLimit(delta);
+        }
+
         async function loadData() {
             try {
                 await loadRealData();
@@ -239,7 +288,6 @@
                 const cached = Database.load(config.symbol, config.interval, config.analysisLimit);
                 if (cached.length > 0) {
                     fullCandleData = cached;
-                    console.log("Using cached data");
                 } else {
                     generateSimulatedData();
                 }
@@ -294,12 +342,17 @@
         function updateStatus() {
             currentPrice = fullCandleData[fullCandleData.length - 1].close;
             lastUpdateTime = new Date();
-            currentPriceDiv.textContent = `Current Price: $${currentPrice.toLocaleString()}`;
+            const up = fullCandleData.length > 1 && currentPrice >= fullCandleData[fullCandleData.length - 2].close;
+            chartTitleDiv.innerHTML = `${config.symbol} (${config.interval}) &nbsp; <span style="color:${up ? '#26a69a' : '#ef5350'}">$${currentPrice.toLocaleString()}</span>`;
             lastUpdatedDiv.textContent = `Last Updated: ${formatTime(lastUpdateTime)}`;
         }
 
         function getIntervalSeconds(interval) {
-            const map = { '1m':60,'5m':300,'15m':900,'30m':1800,'1h':3600,'4h':14400,'1d':86400 };
+            const map = {
+                '1m':60,'3m':180,'5m':300,'15m':900,'30m':1800,
+                '1h':3600,'2h':7200,'3h':10800,'4h':14400,'6h':21600,'8h':28800,'12h':43200,
+                '1d':86400,'2d':172800,'3d':259200,'1w':604800,'1M':2592000
+            };
             return map[interval] || 3600;
         }
 
@@ -405,8 +458,8 @@
             const priceRangeAdj = pMaxAdj - pMinAdj;
             const timeRange = tMax - tMin;
 
-            // Сетка и цены справа
             drawPriceGrid(pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH);
+            // ← ВОТ ОН: индикатор последней свечи
             if (currentPrice !== null) {
                 drawCurrentPriceLine(currentPrice, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH);
             }
@@ -439,6 +492,7 @@
             }
         }
 
+        // ← ВОТ ОНА: функция индикатора последней свечи
         function drawCurrentPriceLine(price, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH) {
             const y = marginY + (pMaxAdj - price) / priceRangeAdj * drawH;
             if (y < marginY || y > h - marginY) return;
@@ -455,6 +509,7 @@
             ctx.stroke();
             ctx.fillStyle = color;
             ctx.font = 'bold 11px Arial';
+            ctx.textAlign = 'left';
             ctx.fillText(`$${price.toLocaleString()}`, w - marginX + 10, y - 2);
         }
 
