@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sigma TA Web - Cryptocurrency Analysis</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background-color: #0b0b15;
+            color: #ffffff;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            background-color: #1a1a2e;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .header label {
+            font-size: 12px;
+            color: #aaa;
+        }
+        .header select, .header input, .header button {
+            background-color: #2d2d44;
+            color: white;
+            border: 1px solid #444;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .header button {
+            background-color: #4CAF50;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .header button:hover {
+            background-color: #45a049;
+        }
+        .container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        .chart-container {
+            flex: 1;
+            position: relative;
+            background-color: #0b0b15;
+        }
+        canvas {
+            display: block;
+        }
+        .status-bar {
+            background-color: #1a1a2e;
+            padding: 5px 15px;
+            font-size: 12px;
+            color: #aaa;
+            display: flex;
+            justify-content: space-between;
+        }
+        .legend {
+            display: flex;
+            gap: 15px;
+            margin-top: 5px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+        }
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <label>Symbol:</label>
+        <select id="symbolSelect">
+            <option value="BTCUSDT">BTCUSDT</option>
+            <option value="ETHUSDT">ETHUSDT</option>
+            <option value="BNBUSDT">BNBUSDT</option>
+            <option value="ADAUSDT">ADAUSDT</option>
+            <option value="SOLUSDT">SOLUSDT</option>
+        </select>
+        <label>Interval:</label>
+        <select id="intervalSelect">
+            <option value="1m">1m</option>
+            <option value="5m">5m</option>
+            <option value="15m">15m</option>
+            <option value="30m">30m</option>
+            <option value="1h" selected>1h</option>
+            <option value="4h">4h</option>
+            <option value="1d">1d</option>
+        </select>
+        <label>History:</label>
+        <input type="number" id="historyLimit" value="500" min="100" max="2000" step="50" style="width: 70px;">
+        <label>EMA Period:</label>
+        <input type="number" id="emaPeriod" value="96" min="10" max="500" step="10" style="width: 60px;">
+        <label>Deriv Window:</label>
+        <input type="number" id="derivWindow" value="4" min="2" max="20" step="1" style="width: 50px;">
+        <label>Update (ms):</label>
+        <input type="number" id="updateInterval" value="5000" min="1000" max="300000" step="1000" style="width: 80px;">
+        <button id="applyBtn">Apply</button>
+    </div>
+    <div class="container">
+        <div class="chart-container">
+            <canvas id="chartCanvas"></canvas>
+        </div>
+    </div>
+    <div class="status-bar">
+        <div id="currentPrice">Current Price: N/A</div>
+        <div id="lastUpdated">Last Updated: --:--:--</div>
+        <div class="legend">
+            <div class="legend-item"><div class="legend-color" style="background-color: #FF00FF;"></div> Strong Positive</div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #FF0000;"></div> Moderate Positive</div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #FFFF00;"></div> Weak Positive</div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #00FFFF;"></div> Strong Negative</div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #0000FF;"></div> Moderate Negative</div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #FFFFFF;"></div> Weak Negative</div>
+        </div>
+    </div>
+    <script>
+        // Configuration object
+        const config = {
+            symbol: 'BTCUSDT',
+            interval: '1h',
+            historyLimit: 500,
+            emaPeriod: 96,
+            derivWindow: 4,
+            updateIntervalMs: 5000,
+            markerOffsetPx: 10
+        };
+        // Data storage
+        let candleData = [];
+        let markers = [];
+        let currentPrice = null;
+        let lastUpdateTime = null;
+        // Canvas elements
+        const canvas = document.getElementById('chartCanvas');
+        const ctx = canvas.getContext('2d');
+        // DOM elements
+        const symbolSelect = document.getElementById('symbolSelect');
+        const intervalSelect = document.getElementById('intervalSelect');
+        const historyLimitInput = document.getElementById('historyLimit');
+        const emaPeriodInput = document.getElementById('emaPeriod');
+        const derivWindowInput = document.getElementById('derivWindow');
+        const updateIntervalInput = document.getElementById('updateInterval');
+        const applyBtn = document.getElementById('applyBtn');
+        const currentPriceDiv = document.getElementById('currentPrice');
+        const lastUpdatedDiv = document.getElementById('lastUpdated');
+        // Database simulation using localStorage
+        const Database = {
+            dbName: 'sigma_candles',
+            initDB: function() {
+                if (!localStorage.getItem(this.dbName)) {
+                    localStorage.setItem(this.dbName, JSON.stringify({}));
+                }
+            },
+            save: function(candles, symbol = null, interval = null) {
+                symbol = symbol || config.symbol;
+                interval = interval || config.interval;
+                try {
+                    const db = JSON.parse(localStorage.getItem(this.dbName)) || {};
+                    const key = `${symbol}_${interval}`;
+                    if (!db[key]) {
+                        db[key] = [];
+                    }
+                    db[key] = db[key].concat(candles);
+                    if (db[key].length > config.historyLimit) {
+                        db[key] = db[key].slice(-config.historyLimit);
+                    }
+                    localStorage.setItem(this.dbName, JSON.stringify(db));
+                } catch (e) {
+                    console.error("Error saving to database:", e);
+                }
+            },
+            load: function(symbol = null, interval = null, limit = null) {
+                symbol = symbol || config.symbol;
+                interval = interval || config.interval;
+                limit = limit || config.historyLimit;
+                try {
+                    const db = JSON.parse(localStorage.getItem(this.dbName)) || {};
+                    const key = `${symbol}_${interval}`;
+                    if (!db[key]) {
+                        return [];
+                    }
+                    const data = db[key];
+                    return data.slice(-limit);
+                } catch (e) {
+                    console.error("Error loading from database:", e);
+                    return [];
+                }
+            },
+            clear: function() {
+                localStorage.removeItem(this.dbName);
+                this.initDB();
+            }
+        };
+        // Initialize the database
+        Database.initDB();
+        // Settings management using localStorage
+        const SettingsManager = {
+            defaultSettings: {
+                symbol: "BTCUSDT",
+                interval: "1h",
+                historyLimit: 500,
+                emaPeriod: 96,
+                derivWindow: 4,
+                markerOffsetPx: 10,
+                updateIntervalMs: 5000,
+                theme: "dark",
+                windowSize: { width: 1200, height: 800 },
+                chartStyle: {
+                    upColor: "#26a69a",
+                    downColor: "#ef5350",
+                    wickColor: "#373737"
+                }
+            },
+            loadSettings: function() {
+                try {
+                    const savedSettings = JSON.parse(localStorage.getItem('sigma_ta_settings')) || {};
+                    const settings = {...this.defaultSettings, ...savedSettings};
+                    return settings;
+                } catch (e) {
+                    console.warn("Error loading settings, using defaults:", e);
+                    return {...this.defaultSettings};
+                }
+            },
+            saveSettings: function() {
+                try {
+                    localStorage.setItem('sigma_ta_settings', JSON.stringify(config));
+                } catch (e) {
+                    console.error("Error saving settings:", e);
+                }
+            },
+            get: function(key, defaultValue = null) {
+                const settings = this.loadSettings();
+                return settings[key] !== undefined ? settings[key] : defaultValue;
+            },
+            set: function(key, value) {
+                config[key] = value;
+                this.saveSettings();
+            },
+            update: function(updates) {
+                Object.keys(updates).forEach(key => {
+                    config[key] = updates[key];
+                });
+                this.saveSettings();
+            }
+        };
+        // Initialize the application
+        function init() {
+            loadConfigFromSettings();
+            setupEventListeners();
+            loadData();
+            startTimer();
+            updateDisplay();
+        }
+        // Load configuration from saved settings
+        function loadConfigFromSettings() {
+            const savedConfig = SettingsManager.loadSettings();
+            Object.keys(savedConfig).forEach(key => {
+                if (config.hasOwnProperty(key)) {
+                    config[key] = savedConfig[key];
+                }
+            });
+            symbolSelect.value = config.symbol;
+            intervalSelect.value = config.interval;
+            historyLimitInput.value = config.historyLimit;
+            emaPeriodInput.value = config.emaPeriod;
+            derivWindowInput.value = config.derivWindow;
+            updateIntervalInput.value = config.updateIntervalMs;
+        }
+        // Set up event listeners
+        function setupEventListeners() {
+            applyBtn.addEventListener('click', applySettings);
+            symbolSelect.addEventListener('change', applySettings);
+            intervalSelect.addEventListener('change', applySettings);
+            historyLimitInput.addEventListener('change', applySettings);
+            emaPeriodInput.addEventListener('change', applySettings);
+            derivWindowInput.addEventListener('change', applySettings);
+            updateIntervalInput.addEventListener('change', applySettings);
+            window.addEventListener('resize', updateDisplay);
+        }
+        // Apply settings from UI
+        function applySettings() {
+            config.symbol = symbolSelect.value;
+            config.interval = intervalSelect.value;
+            config.historyLimit = parseInt(historyLimitInput.value);
+            config.emaPeriod = parseInt(emaPeriodInput.value);
+            config.derivWindow = parseInt(derivWindowInput.value);
+            config.updateIntervalMs = parseInt(updateIntervalInput.value);
+            SettingsManager.update({
+                symbol: config.symbol,
+                interval: config.interval,
+                historyLimit: config.historyLimit,
+                emaPeriod: config.emaPeriod,
+                derivWindow: config.derivWindow,
+                updateIntervalMs: config.updateIntervalMs
+            });
+            document.title = `Sigma TA Web - ${config.symbol} (${config.interval})`;
+            loadData();
+        }
+        // Start the update timer
+        function startTimer() {
+            setInterval(() => {
+                loadData();
+            }, config.updateIntervalMs);
+        }
+        // Load data from Binance API (with fallback to database and simulation)
+        async function loadData() {
+            try {
+                await loadRealData();
+            } catch (error) {
+                console.warn("Failed to load real data:", error.message);
+                const dbData = Database.load();
+                if (dbData && dbData.length > 0) {
+                    console.log("Using cached data from localStorage...");
+                    candleData = dbData;
+                    currentPrice = candleData[candleData.length - 1].close;
+                    lastUpdateTime = new Date();
+                } else {
+                    console.log("Falling back to simulated data...");
+                    generateSimulatedData();
+                }
+            }
+            analyzeData();
+            updateDisplay();
+            Database.save(candleData);
+        }
+        // REAL Binance API call — no proxy, no throw
+        async function loadRealData() {
+            const url = `https://api.binance.com/api/v3/klines?symbol=${config.symbol}&interval=${config.interval}&limit=${config.historyLimit}`;
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Binance API returned ${response.status}`);
+            }
+            const rawData = await response.json();
+            candleData = rawData.map(item => ({
+                time: item[0], // milliseconds since epoch
+                open: parseFloat(item[1]),
+                high: parseFloat(item[2]),
+                low: parseFloat(item[3]),
+                close: parseFloat(item[4])
+            }));
+            currentPrice = candleData[candleData.length - 1].close;
+            lastUpdateTime = new Date();
+            currentPriceDiv.textContent = `Current Price: $${currentPrice.toLocaleString()}`;
+            lastUpdatedDiv.textContent = `Last Updated: ${formatTime(lastUpdateTime)}`;
+        }
+        // Generate simulated candlestick data (fallback only)
+        function generateSimulatedData() {
+            const now = Date.now();
+            const intervalSeconds = getIntervalSeconds(config.interval);
+            const newData = [];
+            let currentTime = now - (config.historyLimit * intervalSeconds * 1000);
+            let basePrice = 40000 + Math.random() * 20000;
+            for (let i = 0; i < config.historyLimit; i++) {
+                const openTime = currentTime;
+                const volatility = 0.02;
+                const changePercent = (Math.random() - 0.5) * volatility * 2;
+                const open = basePrice;
+                const close = open * (1 + changePercent);
+                const high = Math.max(open, close) * (1 + Math.random() * 0.01);
+                const low = Math.min(open, close) * (1 - Math.random() * 0.01);
+                newData.push({
+                    time: openTime,
+                    open: parseFloat(open.toFixed(2)),
+                    high: parseFloat(high.toFixed(2)),
+                    low: parseFloat(low.toFixed(2)),
+                    close: parseFloat(close.toFixed(2))
+                });
+                basePrice = close;
+                currentTime += intervalSeconds * 1000;
+            }
+            candleData = newData;
+            currentPrice = candleData[candleData.length - 1].close;
+            lastUpdateTime = new Date();
+            currentPriceDiv.textContent = `Current Price: $${currentPrice.toLocaleString()}`;
+            lastUpdatedDiv.textContent = `Last Updated: ${formatTime(lastUpdateTime)}`;
+        }
+        // Convert interval string to seconds
+        function getIntervalSeconds(interval) {
+            switch(interval) {
+                case '1m': return 60;
+                case '5m': return 300;
+                case '15m': return 900;
+                case '30m': return 1800;
+                case '1h': return 3600;
+                case '4h': return 14400;
+                case '1d': return 86400;
+                default: return 3600;
+            }
+        }
+        // Format time as HH:MM:SS
+        function formatTime(date) {
+            return date.toTimeString().split(' ')[0];
+        }
+        // Analyze data to calculate EMA and markers
+        function analyzeData() {
+            if (candleData.length < config.emaPeriod + 20) {
+                markers = [];
+                return;
+            }
+            const closes = candleData.map(d => d.close);
+            const emaValues = calculateEMA(closes, config.emaPeriod);
+            const derivValues = calculateDerivative(emaValues, config.derivWindow);
+            markers = findExtremeMarkers(candleData, emaValues, derivValues);
+        }
+        function calculateEMA(prices, period) {
+            const ema = new Array(prices.length);
+            ema[0] = prices[0];
+            const alpha = 2 / (period + 1);
+            for (let i = 1; i < prices.length; i++) {
+                ema[i] = alpha * prices[i] + (1 - alpha) * ema[i-1];
+            }
+            return ema;
+        }
+        function calculateDerivative(values, windowSize) {
+            const derivative = new Array(values.length).fill(0);
+            for (let i = windowSize; i < values.length; i++) {
+                derivative[i] = values[i] - values[i - windowSize];
+            }
+            return derivative;
+        }
+        function findExtremeMarkers(data, emaVals, derivVals) {
+            const start = config.emaPeriod + 10;
+            const end = derivVals.length - 5;
+            const markers = [];
+            if (end > start) {
+                const d1Hist = derivVals.slice(start, end);
+                const mean = d1Hist.reduce((sum, val) => sum + val, 0) / d1Hist.length;
+                const variance = d1Hist.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / d1Hist.length;
+                const std = Math.sqrt(variance || 1);
+                if (std !== 0) {
+                    const zScores = derivVals.map(val => (val - mean) / std);
+                    for (let i = start; i < end; i++) {
+                        const zi = zScores[i];
+                        if (Math.abs(zi) < 1) continue;
+                        const d = data[i];
+                        let color, isAbove, yPrice;
+                        if (zi > 0) {
+                            yPrice = d.high;
+                            isAbove = true;
+                            color = Math.abs(zi) >= 3 ? '#FF00FF' : Math.abs(zi) >= 2 ? '#FF0000' : '#FFFF00';
+                        } else {
+                            yPrice = d.low;
+                            isAbove = false;
+                            color = Math.abs(zi) >= 3 ? '#00FFFF' : Math.abs(zi) >= 2 ? '#0000FF' : '#FFFFFF';
+                        }
+                        markers.push({ time: d.time, price: yPrice, color: color, isAbove: isAbove });
+                    }
+                }
+            }
+            return markers;
+        }
+        function updateDisplay() {
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            drawChart();
+        }
+        function drawChart() {
+            if (!candleData.length) return;
+            const width = canvas.width;
+            const height = canvas.height;
+            const marginX = 70;
+            const marginY = 50;
+            const drawWidth = width - 2 * marginX;
+            const drawHeight = height - 2 * marginY;
+            ctx.fillStyle = '#0b0b15';
+            ctx.fillRect(0, 0, width, height);
+            const times = candleData.map(d => d.time);
+            const lows = candleData.map(d => d.low);
+            const highs = candleData.map(d => d.high);
+            const tMin = Math.min(...times);
+            const tMax = Math.max(...times);
+            const pMin = Math.min(...lows);
+            const pMax = Math.max(...highs);
+            const priceRangeOrig = pMax - pMin;
+            const padding = priceRangeOrig * 0.05;
+            const pMinAdj = pMin - padding;
+            const pMaxAdj = pMax + padding;
+            const priceRangeAdj = pMaxAdj - pMinAdj;
+            const timeRange = tMax - tMin;
+            drawPriceGrid(pMinAdj, pMaxAdj, priceRangeAdj, width, height, marginX, marginY, drawHeight);
+            if (currentPrice !== null) {
+                drawCurrentPriceLine(currentPrice, pMinAdj, pMaxAdj, priceRangeAdj, width, height, marginX, marginY, drawHeight);
+            }
+            drawDailyBoundaries(candleData, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, width, height, marginX, marginY, drawHeight);
+            drawCandles(candleData, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, width, height, marginX, marginY, drawHeight);
+            drawMarkers(markers, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, width, height, marginX, marginY, drawHeight);
+        }
+        function drawPriceGrid(pMinAdj, pMaxAdj, priceRangeAdj, width, height, marginX, marginY, drawHeight) {
+            const rawStep = priceRangeAdj / 6;
+            const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
+            const priceStep = magnitude * Math.round(rawStep / magnitude) || rawStep;
+            const startPrice = priceStep * Math.floor(pMinAdj / priceStep);
+            const numLines = Math.ceil((pMaxAdj - startPrice) / priceStep) + 1;
+            for (let i = 0; i < numLines; i++) {
+                const price = startPrice + i * priceStep;
+                if (price < pMinAdj || price > pMaxAdj) continue;
+                const y = marginY + (pMaxAdj - price) / priceRangeAdj * drawHeight;
+                if (marginY <= y && y <= height - marginY) {
+                    ctx.strokeStyle = '#333333';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(marginX, y);
+                    ctx.lineTo(width - marginX, y);
+                    ctx.stroke();
+                    ctx.fillStyle = '#AAAAAA';
+                    ctx.font = '10px Arial';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(price.toLocaleString(), width - marginX + 10, y + 4);
+                }
+            }
+        }
+        function drawCurrentPriceLine(currentPrice, pMinAdj, pMaxAdj, priceRangeAdj, width, height, marginX, marginY, drawHeight) {
+            const yCurr = marginY + (pMaxAdj - currentPrice) / priceRangeAdj * drawHeight;
+            if (marginY <= yCurr && yCurr <= height - marginY) {
+                let color = candleData.length > 1 && currentPrice >= candleData[candleData.length - 2].close ? '#26a69a' : '#ef5350';
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(marginX, yCurr);
+                ctx.lineTo(width - marginX, yCurr);
+                ctx.stroke();
+                ctx.fillStyle = color;
+                ctx.font = 'bold 11px Arial';
+                ctx.textAlign = 'left';
+                ctx.fillText(`$${currentPrice.toLocaleString()}`, width - marginX + 10, yCurr - 2);
+            }
+        }
+        function drawDailyBoundaries(data, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, width, height, marginX, marginY, drawHeight) {
+            const seenDays = new Set();
+            for (const d of data) {
+                const t = d.time;
+                const dt = new Date(t);
+                const dayKey = `${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}`;
+                if (seenDays.has(dayKey)) continue;
+                seenDays.add(dayKey);
+                const dayStart = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime();
+                if (dayStart < tMin || dayStart > tMin + timeRange) continue;
+                const x = marginX + (dayStart - tMin) / timeRange * (width - 2 * marginX);
+                ctx.strokeStyle = '#555577';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(x, marginY);
+                ctx.lineTo(x, height - marginY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = '#8888CC';
+                ctx.font = '10px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(`${dt.getMonth()+1}-${dt.getDate()}`, x, height - 15);
+            }
+        }
+        function drawCandles(data, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, width, height, marginX, marginY, drawHeight) {
+            const candleWidth = Math.max(2, (width - 2 * marginX) / data.length * 0.8);
+            for (const d of data) {
+                const x = marginX + (d.time - tMin) / timeRange * (width - 2 * marginX);
+                const yOpen = marginY + (pMaxAdj - d.open) / priceRangeAdj * drawHeight;
+                const yClose = marginY + (pMaxAdj - d.close) / priceRangeAdj * drawHeight;
+                const yHigh = marginY + (pMaxAdj - d.high) / priceRangeAdj * drawHeight;
+                const yLow = marginY + (pMaxAdj - d.low) / priceRangeAdj * drawHeight;
+                ctx.strokeStyle = '#666666';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(x, yHigh);
+                ctx.lineTo(x, yLow);
+                ctx.stroke();
+                const isUp = d.close >= d.open;
+                ctx.strokeStyle = isUp ? '#26a69a' : '#ef5350';
+                ctx.fillStyle = isUp ? '#26a69a' : '#ef5350';
+                ctx.lineWidth = Math.max(2, candleWidth);
+                const yBody = Math.min(yOpen, yClose);
+                const bodyHeight = Math.abs(yClose - yOpen);
+                if (bodyHeight < 2) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, yBody - 1);
+                    ctx.lineTo(x, yBody + 1);
+                    ctx.stroke();
+                } else {
+                    ctx.beginPath();
+                    ctx.moveTo(x, yBody);
+                    ctx.lineTo(x, yBody + bodyHeight);
+                    ctx.stroke();
+                }
+            }
+        }
+        function drawMarkers(markers, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, width, height, marginX, marginY, drawHeight) {
+            for (const marker of markers) {
+                const x = marginX + (marker.time - tMin) / timeRange * (width - 2 * marginX);
+                const yBase = marginY + (pMaxAdj - marker.price) / priceRangeAdj * drawHeight;
+                const yMarker = marker.isAbove ? yBase - config.markerOffsetPx : yBase + config.markerOffsetPx;
+                ctx.fillStyle = marker.color;
+                ctx.beginPath();
+                ctx.arc(x, yMarker, 3, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+        }
+        window.onload = init;
+    </script>
+</body>
+</html>
