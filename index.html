@@ -24,7 +24,7 @@
             padding: 10px 20px;
             display: flex;
             align-items: center;
-            gap: 15px;
+            gap: 10px;
             flex-wrap: wrap;
         }
         .header label {
@@ -68,22 +68,6 @@
             display: flex;
             justify-content: space-between;
         }
-        .legend {
-            display: flex;
-            gap: 15px;
-            margin-top: 5px;
-        }
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            font-size: 11px;
-        }
-        .legend-color {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-        }
     </style>
 </head>
 <body>
@@ -106,14 +90,16 @@
             <option value="4h">4h</option>
             <option value="1d">1d</option>
         </select>
-        <label>History:</label>
-        <input type="number" id="historyLimit" value="500" min="100" max="2000" step="50" style="width: 70px;">
+        <label>Analysis:</label>
+        <input type="number" id="analysisLimit" value="10000" min="500" max="20000" step="500" style="width: 75px;">
+        <label>Display:</label>
+        <input type="number" id="displayLimit" value="500" min="10" max="1000" step="10" style="width: 65px;">
         <label>EMA Period:</label>
-        <input type="number" id="emaPeriod" value="96" min="10" max="500" step="10" style="width: 60px;">
-        <label>Deriv Window:</label>
-        <input type="number" id="derivWindow" value="4" min="2" max="20" step="1" style="width: 50px;">
+        <input type="number" id="emaPeriod" value="96" min="10" max="500" step="10" style="width: 55px;">
+        <label>Deriv Win:</label>
+        <input type="number" id="derivWindow" value="4" min="2" max="20" step="1" style="width: 45px;">
         <label>Update (ms):</label>
-        <input type="number" id="updateInterval" value="5000" min="1000" max="300000" step="1000" style="width: 80px;">
+        <input type="number" id="updateInterval" value="5000" min="1000" max="300000" step="1000" style="width: 75px;">
         <button id="applyBtn">Apply</button>
     </div>
     <div class="container">
@@ -124,461 +110,388 @@
     <div class="status-bar">
         <div id="currentPrice">Current Price: N/A</div>
         <div id="lastUpdated">Last Updated: --:--:--</div>
-        <div class="legend">
-            <div class="legend-item"><div class="legend-color" style="background-color: #FF00FF;"></div> Strong Positive</div>
-            <div class="legend-item"><div class="legend-color" style="background-color: #FF0000;"></div> Moderate Positive</div>
-            <div class="legend-item"><div class="legend-color" style="background-color: #FFFF00;"></div> Weak Positive</div>
-            <div class="legend-item"><div class="legend-color" style="background-color: #00FFFF;"></div> Strong Negative</div>
-            <div class="legend-item"><div class="legend-color" style="background-color: #0000FF;"></div> Moderate Negative</div>
-            <div class="legend-item"><div class="legend-color" style="background-color: #FFFFFF;"></div> Weak Negative</div>
-        </div>
     </div>
     <script>
-        // Configuration object
         const config = {
             symbol: 'BTCUSDT',
             interval: '1h',
-            historyLimit: 500,
+            analysisLimit: 10000,
+            displayLimit: 500,
             emaPeriod: 96,
             derivWindow: 4,
             updateIntervalMs: 5000,
             markerOffsetPx: 10
         };
-        // Data storage
-        let candleData = [];
+
+        let fullCandleData = []; // полный набор для анализа
         let markers = [];
         let currentPrice = null;
         let lastUpdateTime = null;
-        // Canvas elements
+
         const canvas = document.getElementById('chartCanvas');
         const ctx = canvas.getContext('2d');
-        // DOM elements
+
         const symbolSelect = document.getElementById('symbolSelect');
         const intervalSelect = document.getElementById('intervalSelect');
-        const historyLimitInput = document.getElementById('historyLimit');
+        const analysisLimitInput = document.getElementById('analysisLimit');
+        const displayLimitInput = document.getElementById('displayLimit');
         const emaPeriodInput = document.getElementById('emaPeriod');
         const derivWindowInput = document.getElementById('derivWindow');
         const updateIntervalInput = document.getElementById('updateInterval');
         const applyBtn = document.getElementById('applyBtn');
         const currentPriceDiv = document.getElementById('currentPrice');
         const lastUpdatedDiv = document.getElementById('lastUpdated');
-        // Database simulation using localStorage
+
         const Database = {
-            dbName: 'sigma_candles',
-            initDB: function() {
+            dbName: 'sigma_candles_v2',
+            initDB: () => {
                 if (!localStorage.getItem(this.dbName)) {
                     localStorage.setItem(this.dbName, JSON.stringify({}));
                 }
             },
-            save: function(candles, symbol = null, interval = null) {
-                symbol = symbol || config.symbol;
-                interval = interval || config.interval;
+            save: (candles, symbol, interval) => {
                 try {
                     const db = JSON.parse(localStorage.getItem(this.dbName)) || {};
                     const key = `${symbol}_${interval}`;
-                    if (!db[key]) {
-                        db[key] = [];
-                    }
-                    db[key] = db[key].concat(candles);
-                    if (db[key].length > config.historyLimit) {
-                        db[key] = db[key].slice(-config.historyLimit);
-                    }
+                    db[key] = candles.slice(-20000); // keep up to 20k
                     localStorage.setItem(this.dbName, JSON.stringify(db));
                 } catch (e) {
-                    console.error("Error saving to database:", e);
+                    console.error("DB save error:", e);
                 }
             },
-            load: function(symbol = null, interval = null, limit = null) {
-                symbol = symbol || config.symbol;
-                interval = interval || config.interval;
-                limit = limit || config.historyLimit;
+            load: (symbol, interval, limit) => {
                 try {
                     const db = JSON.parse(localStorage.getItem(this.dbName)) || {};
                     const key = `${symbol}_${interval}`;
-                    if (!db[key]) {
-                        return [];
-                    }
-                    const data = db[key];
-                    return data.slice(-limit);
+                    return db[key] ? db[key].slice(-limit) : [];
                 } catch (e) {
-                    console.error("Error loading from database:", e);
+                    console.error("DB load error:", e);
                     return [];
                 }
-            },
-            clear: function() {
-                localStorage.removeItem(this.dbName);
-                this.initDB();
             }
         };
-        // Initialize the database
+
         Database.initDB();
-        // Settings management using localStorage
+
         const SettingsManager = {
-            defaultSettings: {
-                symbol: "BTCUSDT",
-                interval: "1h",
-                historyLimit: 500,
-                emaPeriod: 96,
-                derivWindow: 4,
-                markerOffsetPx: 10,
-                updateIntervalMs: 5000,
-                theme: "dark",
-                windowSize: { width: 1200, height: 800 },
-                chartStyle: {
-                    upColor: "#26a69a",
-                    downColor: "#ef5350",
-                    wickColor: "#373737"
-                }
-            },
-            loadSettings: function() {
+            key: 'sigma_ta_settings_v2',
+            load: () => {
                 try {
-                    const savedSettings = JSON.parse(localStorage.getItem('sigma_ta_settings')) || {};
-                    const settings = {...this.defaultSettings, ...savedSettings};
-                    return settings;
-                } catch (e) {
-                    console.warn("Error loading settings, using defaults:", e);
-                    return {...this.defaultSettings};
+                    return JSON.parse(localStorage.getItem(this.key)) || config;
+                } catch {
+                    return {...config};
                 }
             },
-            saveSettings: function() {
+            save: () => {
                 try {
-                    localStorage.setItem('sigma_ta_settings', JSON.stringify(config));
+                    localStorage.setItem(this.key, JSON.stringify(config));
                 } catch (e) {
-                    console.error("Error saving settings:", e);
+                    console.error("Settings save error:", e);
                 }
-            },
-            get: function(key, defaultValue = null) {
-                const settings = this.loadSettings();
-                return settings[key] !== undefined ? settings[key] : defaultValue;
-            },
-            set: function(key, value) {
-                config[key] = value;
-                this.saveSettings();
-            },
-            update: function(updates) {
-                Object.keys(updates).forEach(key => {
-                    config[key] = updates[key];
-                });
-                this.saveSettings();
             }
         };
-        // Initialize the application
+
         function init() {
-            loadConfigFromSettings();
-            setupEventListeners();
+            loadSettings();
+            setupListeners();
             loadData();
-            startTimer();
+            setInterval(loadData, config.updateIntervalMs);
+            window.addEventListener('resize', updateDisplay);
             updateDisplay();
         }
-        // Load configuration from saved settings
-        function loadConfigFromSettings() {
-            const savedConfig = SettingsManager.loadSettings();
-            Object.keys(savedConfig).forEach(key => {
-                if (config.hasOwnProperty(key)) {
-                    config[key] = savedConfig[key];
-                }
-            });
+
+        function loadSettings() {
+            const saved = SettingsManager.load();
+            Object.assign(config, saved);
             symbolSelect.value = config.symbol;
             intervalSelect.value = config.interval;
-            historyLimitInput.value = config.historyLimit;
+            analysisLimitInput.value = config.analysisLimit;
+            displayLimitInput.value = config.displayLimit;
             emaPeriodInput.value = config.emaPeriod;
             derivWindowInput.value = config.derivWindow;
             updateIntervalInput.value = config.updateIntervalMs;
         }
-        // Set up event listeners
-        function setupEventListeners() {
+
+        function setupListeners() {
+            const inputs = [symbolSelect, intervalSelect, analysisLimitInput, displayLimitInput, emaPeriodInput, derivWindowInput, updateIntervalInput];
             applyBtn.addEventListener('click', applySettings);
-            symbolSelect.addEventListener('change', applySettings);
-            intervalSelect.addEventListener('change', applySettings);
-            historyLimitInput.addEventListener('change', applySettings);
-            emaPeriodInput.addEventListener('change', applySettings);
-            derivWindowInput.addEventListener('change', applySettings);
-            updateIntervalInput.addEventListener('change', applySettings);
-            window.addEventListener('resize', updateDisplay);
+            inputs.forEach(el => el.addEventListener('change', applySettings));
         }
-        // Apply settings from UI
+
         function applySettings() {
             config.symbol = symbolSelect.value;
             config.interval = intervalSelect.value;
-            config.historyLimit = parseInt(historyLimitInput.value);
+            config.analysisLimit = parseInt(analysisLimitInput.value);
+            config.displayLimit = parseInt(displayLimitInput.value);
             config.emaPeriod = parseInt(emaPeriodInput.value);
             config.derivWindow = parseInt(derivWindowInput.value);
             config.updateIntervalMs = parseInt(updateIntervalInput.value);
-            SettingsManager.update({
-                symbol: config.symbol,
-                interval: config.interval,
-                historyLimit: config.historyLimit,
-                emaPeriod: config.emaPeriod,
-                derivWindow: config.derivWindow,
-                updateIntervalMs: config.updateIntervalMs
-            });
+            SettingsManager.save();
             document.title = `Sigma TA Web - ${config.symbol} (${config.interval})`;
             loadData();
         }
-        // Start the update timer
-        function startTimer() {
-            setInterval(() => {
-                loadData();
-            }, config.updateIntervalMs);
-        }
-        // Load data from Binance API (with fallback to database and simulation)
+
         async function loadData() {
             try {
                 await loadRealData();
-            } catch (error) {
-                console.warn("Failed to load real data:", error.message);
-                const dbData = Database.load();
-                if (dbData && dbData.length > 0) {
-                    console.log("Using cached data from localStorage...");
-                    candleData = dbData;
-                    currentPrice = candleData[candleData.length - 1].close;
-                    lastUpdateTime = new Date();
+            } catch (err) {
+                console.warn("Real data failed:", err.message);
+                const cached = Database.load(config.symbol, config.interval, config.analysisLimit);
+                if (cached.length > 0) {
+                    fullCandleData = cached;
+                    console.log("Using cached data");
                 } else {
-                    console.log("Falling back to simulated data...");
                     generateSimulatedData();
                 }
+                updateStatus();
             }
             analyzeData();
             updateDisplay();
-            Database.save(candleData);
+            Database.save(fullCandleData, config.symbol, config.interval);
         }
-        // REAL Binance API call — no proxy, no throw
+
         async function loadRealData() {
-            const url = `https://api.binance.com/api/v3/klines?symbol=${config.symbol}&interval=${config.interval}&limit=${config.historyLimit}`;
-            const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error(`Binance API returned ${response.status}`);
-            }
-            const rawData = await response.json();
-            candleData = rawData.map(item => ({
-                time: item[0], // milliseconds since epoch
+            const url = `https://api.binance.com/api/v3/klines?symbol=${config.symbol}&interval=${config.interval}&limit=${config.analysisLimit}`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const raw = await res.json();
+            fullCandleData = raw.map(item => ({
+                time: item[0],
                 open: parseFloat(item[1]),
                 high: parseFloat(item[2]),
                 low: parseFloat(item[3]),
                 close: parseFloat(item[4])
             }));
-            currentPrice = candleData[candleData.length - 1].close;
-            lastUpdateTime = new Date();
-            currentPriceDiv.textContent = `Current Price: $${currentPrice.toLocaleString()}`;
-            lastUpdatedDiv.textContent = `Last Updated: ${formatTime(lastUpdateTime)}`;
+            updateStatus();
         }
-        // Generate simulated candlestick data (fallback only)
+
         function generateSimulatedData() {
             const now = Date.now();
-            const intervalSeconds = getIntervalSeconds(config.interval);
-            const newData = [];
-            let currentTime = now - (config.historyLimit * intervalSeconds * 1000);
-            let basePrice = 40000 + Math.random() * 20000;
-            for (let i = 0; i < config.historyLimit; i++) {
-                const openTime = currentTime;
-                const volatility = 0.02;
-                const changePercent = (Math.random() - 0.5) * volatility * 2;
-                const open = basePrice;
-                const close = open * (1 + changePercent);
+            const sec = getIntervalSeconds(config.interval);
+            fullCandleData = [];
+            let t = now - config.analysisLimit * sec * 1000;
+            let price = 40000 + Math.random() * 20000;
+            for (let i = 0; i < config.analysisLimit; i++) {
+                const vol = 0.02;
+                const chg = (Math.random() - 0.5) * vol * 2;
+                const open = price;
+                const close = open * (1 + chg);
                 const high = Math.max(open, close) * (1 + Math.random() * 0.01);
                 const low = Math.min(open, close) * (1 - Math.random() * 0.01);
-                newData.push({
-                    time: openTime,
+                fullCandleData.push({
+                    time: t,
                     open: parseFloat(open.toFixed(2)),
                     high: parseFloat(high.toFixed(2)),
                     low: parseFloat(low.toFixed(2)),
                     close: parseFloat(close.toFixed(2))
                 });
-                basePrice = close;
-                currentTime += intervalSeconds * 1000;
+                price = close;
+                t += sec * 1000;
             }
-            candleData = newData;
-            currentPrice = candleData[candleData.length - 1].close;
+            updateStatus();
+        }
+
+        function updateStatus() {
+            currentPrice = fullCandleData[fullCandleData.length - 1].close;
             lastUpdateTime = new Date();
             currentPriceDiv.textContent = `Current Price: $${currentPrice.toLocaleString()}`;
             lastUpdatedDiv.textContent = `Last Updated: ${formatTime(lastUpdateTime)}`;
         }
-        // Convert interval string to seconds
+
         function getIntervalSeconds(interval) {
-            switch(interval) {
-                case '1m': return 60;
-                case '5m': return 300;
-                case '15m': return 900;
-                case '30m': return 1800;
-                case '1h': return 3600;
-                case '4h': return 14400;
-                case '1d': return 86400;
-                default: return 3600;
-            }
+            const map = { '1m':60,'5m':300,'15m':900,'30m':1800,'1h':3600,'4h':14400,'1d':86400 };
+            return map[interval] || 3600;
         }
-        // Format time as HH:MM:SS
+
         function formatTime(date) {
             return date.toTimeString().split(' ')[0];
         }
-        // Analyze data to calculate EMA and markers
+
         function analyzeData() {
-            if (candleData.length < config.emaPeriod + 20) {
+            if (fullCandleData.length < config.emaPeriod + 20) {
                 markers = [];
                 return;
             }
-            const closes = candleData.map(d => d.close);
-            const emaValues = calculateEMA(closes, config.emaPeriod);
-            const derivValues = calculateDerivative(emaValues, config.derivWindow);
-            markers = findExtremeMarkers(candleData, emaValues, derivValues);
+            const closes = fullCandleData.map(d => d.close);
+            const ema = calculateEMA(closes, config.emaPeriod);
+            const deriv = calculateDerivative(ema, config.derivWindow);
+            markers = findExtremeMarkers(fullCandleData, ema, deriv);
         }
+
         function calculateEMA(prices, period) {
-            const ema = new Array(prices.length);
-            ema[0] = prices[0];
+            const ema = [prices[0]];
             const alpha = 2 / (period + 1);
             for (let i = 1; i < prices.length; i++) {
                 ema[i] = alpha * prices[i] + (1 - alpha) * ema[i-1];
             }
             return ema;
         }
-        function calculateDerivative(values, windowSize) {
-            const derivative = new Array(values.length).fill(0);
-            for (let i = windowSize; i < values.length; i++) {
-                derivative[i] = values[i] - values[i - windowSize];
+
+        function calculateDerivative(vals, w) {
+            const d = new Array(vals.length).fill(0);
+            for (let i = w; i < vals.length; i++) {
+                d[i] = vals[i] - vals[i - w];
             }
-            return derivative;
+            return d;
         }
-        function findExtremeMarkers(data, emaVals, derivVals) {
+
+        function findExtremeMarkers(data, ema, deriv) {
             const start = config.emaPeriod + 10;
-            const end = derivVals.length - 5;
-            const markers = [];
-            if (end > start) {
-                const d1Hist = derivVals.slice(start, end);
-                const mean = d1Hist.reduce((sum, val) => sum + val, 0) / d1Hist.length;
-                const variance = d1Hist.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / d1Hist.length;
-                const std = Math.sqrt(variance || 1);
-                if (std !== 0) {
-                    const zScores = derivVals.map(val => (val - mean) / std);
-                    for (let i = start; i < end; i++) {
-                        const zi = zScores[i];
-                        if (Math.abs(zi) < 1) continue;
-                        const d = data[i];
-                        let color, isAbove, yPrice;
-                        if (zi > 0) {
-                            yPrice = d.high;
-                            isAbove = true;
-                            color = Math.abs(zi) >= 3 ? '#FF00FF' : Math.abs(zi) >= 2 ? '#FF0000' : '#FFFF00';
-                        } else {
-                            yPrice = d.low;
-                            isAbove = false;
-                            color = Math.abs(zi) >= 3 ? '#00FFFF' : Math.abs(zi) >= 2 ? '#0000FF' : '#FFFFFF';
-                        }
-                        markers.push({ time: d.time, price: yPrice, color: color, isAbove: isAbove });
-                    }
+            const end = deriv.length - 5;
+            if (end <= start) return [];
+            const slice = deriv.slice(start, end);
+            const mean = slice.reduce((a,b) => a + b, 0) / slice.length;
+            const variance = slice.reduce((a,b) => a + Math.pow(b - mean, 2), 0) / slice.length;
+            const std = Math.sqrt(variance || 1);
+            if (std === 0) return [];
+            const z = deriv.map(v => (v - mean) / std);
+            const res = [];
+            for (let i = start; i < end; i++) {
+                const zi = z[i];
+                if (Math.abs(zi) < 1) continue;
+                const d = data[i];
+                let color, yPrice, isAbove;
+                if (zi > 0) {
+                    yPrice = d.high;
+                    isAbove = true;
+                    color = Math.abs(zi) >= 3 ? '#FF00FF' : Math.abs(zi) >= 2 ? '#FF0000' : '#FFFF00';
+                } else {
+                    yPrice = d.low;
+                    isAbove = false;
+                    color = Math.abs(zi) >= 3 ? '#00FFFF' : Math.abs(zi) >= 2 ? '#0000FF' : '#FFFFFF';
                 }
+                res.push({ time: d.time, price: yPrice, color, isAbove });
             }
-            return markers;
+            return res;
         }
+
         function updateDisplay() {
-            const container = canvas.parentElement;
-            canvas.width = container.clientWidth;
-            canvas.height = container.clientHeight;
+            const cont = canvas.parentElement;
+            canvas.width = cont.clientWidth;
+            canvas.height = cont.clientHeight;
             drawChart();
         }
+
         function drawChart() {
-            if (!candleData.length) return;
-            const width = canvas.width;
-            const height = canvas.height;
+            if (!fullCandleData.length) return;
+
+            const displayData = fullCandleData.slice(-config.displayLimit);
+            const visibleTimes = new Set(displayData.map(d => d.time));
+            const visibleMarkers = markers.filter(m => visibleTimes.has(m.time));
+
+            const w = canvas.width;
+            const h = canvas.height;
             const marginX = 70;
             const marginY = 50;
-            const drawWidth = width - 2 * marginX;
-            const drawHeight = height - 2 * marginY;
+            const drawW = w - 2 * marginX;
+            const drawH = h - 2 * marginY;
+
             ctx.fillStyle = '#0b0b15';
-            ctx.fillRect(0, 0, width, height);
-            const times = candleData.map(d => d.time);
-            const lows = candleData.map(d => d.low);
-            const highs = candleData.map(d => d.high);
+            ctx.fillRect(0, 0, w, h);
+
+            if (displayData.length === 0) return;
+
+            const times = displayData.map(d => d.time);
+            const lows = displayData.map(d => d.low);
+            const highs = displayData.map(d => d.high);
             const tMin = Math.min(...times);
             const tMax = Math.max(...times);
             const pMin = Math.min(...lows);
             const pMax = Math.max(...highs);
-            const priceRangeOrig = pMax - pMin;
-            const padding = priceRangeOrig * 0.05;
+            const priceRange = pMax - pMin;
+            const padding = priceRange * 0.05;
             const pMinAdj = pMin - padding;
             const pMaxAdj = pMax + padding;
             const priceRangeAdj = pMaxAdj - pMinAdj;
             const timeRange = tMax - tMin;
-            drawPriceGrid(pMinAdj, pMaxAdj, priceRangeAdj, width, height, marginX, marginY, drawHeight);
+
+            // Сетка и цены справа
+            drawPriceGrid(pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH);
             if (currentPrice !== null) {
-                drawCurrentPriceLine(currentPrice, pMinAdj, pMaxAdj, priceRangeAdj, width, height, marginX, marginY, drawHeight);
+                drawCurrentPriceLine(currentPrice, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH);
             }
-            drawDailyBoundaries(candleData, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, width, height, marginX, marginY, drawHeight);
-            drawCandles(candleData, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, width, height, marginX, marginY, drawHeight);
-            drawMarkers(markers, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, width, height, marginX, marginY, drawHeight);
+            drawDailyBoundaries(displayData, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH);
+            drawCandles(displayData, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH);
+            drawMarkers(visibleMarkers, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH);
+            drawLegendLeft(w, h, marginY);
         }
-        function drawPriceGrid(pMinAdj, pMaxAdj, priceRangeAdj, width, height, marginX, marginY, drawHeight) {
+
+        function drawPriceGrid(pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH) {
             const rawStep = priceRangeAdj / 6;
-            const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
-            const priceStep = magnitude * Math.round(rawStep / magnitude) || rawStep;
-            const startPrice = priceStep * Math.floor(pMinAdj / priceStep);
-            const numLines = Math.ceil((pMaxAdj - startPrice) / priceStep) + 1;
-            for (let i = 0; i < numLines; i++) {
-                const price = startPrice + i * priceStep;
+            const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
+            const step = mag * Math.round(rawStep / mag) || rawStep;
+            const start = step * Math.floor(pMinAdj / step);
+            const n = Math.ceil((pMaxAdj - start) / step) + 1;
+            for (let i = 0; i < n; i++) {
+                const price = start + i * step;
                 if (price < pMinAdj || price > pMaxAdj) continue;
-                const y = marginY + (pMaxAdj - price) / priceRangeAdj * drawHeight;
-                if (marginY <= y && y <= height - marginY) {
-                    ctx.strokeStyle = '#333333';
-                    ctx.lineWidth = 1;
-                    ctx.beginPath();
-                    ctx.moveTo(marginX, y);
-                    ctx.lineTo(width - marginX, y);
-                    ctx.stroke();
-                    ctx.fillStyle = '#AAAAAA';
-                    ctx.font = '10px Arial';
-                    ctx.textAlign = 'left';
-                    ctx.fillText(price.toLocaleString(), width - marginX + 10, y + 4);
-                }
-            }
-        }
-        function drawCurrentPriceLine(currentPrice, pMinAdj, pMaxAdj, priceRangeAdj, width, height, marginX, marginY, drawHeight) {
-            const yCurr = marginY + (pMaxAdj - currentPrice) / priceRangeAdj * drawHeight;
-            if (marginY <= yCurr && yCurr <= height - marginY) {
-                let color = candleData.length > 1 && currentPrice >= candleData[candleData.length - 2].close ? '#26a69a' : '#ef5350';
-                ctx.strokeStyle = color;
+                const y = marginY + (pMaxAdj - price) / priceRangeAdj * drawH;
+                if (y < marginY || y > h - marginY) continue;
+                ctx.strokeStyle = '#333';
                 ctx.lineWidth = 1;
                 ctx.beginPath();
-                ctx.moveTo(marginX, yCurr);
-                ctx.lineTo(width - marginX, yCurr);
+                ctx.moveTo(marginX, y);
+                ctx.lineTo(w - marginX, y);
                 ctx.stroke();
-                ctx.fillStyle = color;
-                ctx.font = 'bold 11px Arial';
-                ctx.textAlign = 'left';
-                ctx.fillText(`$${currentPrice.toLocaleString()}`, width - marginX + 10, yCurr - 2);
+                ctx.fillStyle = '#AAA';
+                ctx.font = '10px Arial';
+                ctx.fillText(price.toLocaleString(), w - marginX + 10, y + 4);
             }
         }
-        function drawDailyBoundaries(data, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, width, height, marginX, marginY, drawHeight) {
-            const seenDays = new Set();
+
+        function drawCurrentPriceLine(price, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH) {
+            const y = marginY + (pMaxAdj - price) / priceRangeAdj * drawH;
+            if (y < marginY || y > h - marginY) return;
+            let color = '#00FFFF';
+            if (fullCandleData.length > 1) {
+                const prev = fullCandleData[fullCandleData.length - 2].close;
+                color = price >= prev ? '#26a69a' : '#ef5350';
+            }
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(marginX, y);
+            ctx.lineTo(w - marginX, y);
+            ctx.stroke();
+            ctx.fillStyle = color;
+            ctx.font = 'bold 11px Arial';
+            ctx.fillText(`$${price.toLocaleString()}`, w - marginX + 10, y - 2);
+        }
+
+        function drawDailyBoundaries(data, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH) {
+            const seen = new Set();
             for (const d of data) {
-                const t = d.time;
-                const dt = new Date(t);
-                const dayKey = `${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}`;
-                if (seenDays.has(dayKey)) continue;
-                seenDays.add(dayKey);
+                const dt = new Date(d.time);
+                const key = dt.toDateString();
+                if (seen.has(key)) continue;
+                seen.add(key);
                 const dayStart = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime();
                 if (dayStart < tMin || dayStart > tMin + timeRange) continue;
-                const x = marginX + (dayStart - tMin) / timeRange * (width - 2 * marginX);
-                ctx.strokeStyle = '#555577';
+                const x = marginX + (dayStart - tMin) / timeRange * (w - 2 * marginX);
+                ctx.strokeStyle = '#555777';
                 ctx.lineWidth = 1;
-                ctx.setLineDash([5, 5]);
+                ctx.setLineDash([5,5]);
                 ctx.beginPath();
                 ctx.moveTo(x, marginY);
-                ctx.lineTo(x, height - marginY);
+                ctx.lineTo(x, h - marginY);
                 ctx.stroke();
                 ctx.setLineDash([]);
-                ctx.fillStyle = '#8888CC';
+                ctx.fillStyle = '#888CCC';
                 ctx.font = '10px Arial';
                 ctx.textAlign = 'center';
-                ctx.fillText(`${dt.getMonth()+1}-${dt.getDate()}`, x, height - 15);
+                ctx.fillText(`${dt.getMonth()+1}-${dt.getDate()}`, x, h - 15);
             }
         }
-        function drawCandles(data, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, width, height, marginX, marginY, drawHeight) {
-            const candleWidth = Math.max(2, (width - 2 * marginX) / data.length * 0.8);
+
+        function drawCandles(data, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH) {
+            const candleWidth = Math.max(1, (w - 2 * marginX) / data.length * 0.8);
             for (const d of data) {
-                const x = marginX + (d.time - tMin) / timeRange * (width - 2 * marginX);
-                const yOpen = marginY + (pMaxAdj - d.open) / priceRangeAdj * drawHeight;
-                const yClose = marginY + (pMaxAdj - d.close) / priceRangeAdj * drawHeight;
-                const yHigh = marginY + (pMaxAdj - d.high) / priceRangeAdj * drawHeight;
-                const yLow = marginY + (pMaxAdj - d.low) / priceRangeAdj * drawHeight;
-                ctx.strokeStyle = '#666666';
+                const x = marginX + (d.time - tMin) / timeRange * (w - 2 * marginX);
+                const yOpen = marginY + (pMaxAdj - d.open) / priceRangeAdj * drawH;
+                const yClose = marginY + (pMaxAdj - d.close) / priceRangeAdj * drawH;
+                const yHigh = marginY + (pMaxAdj - d.high) / priceRangeAdj * drawH;
+                const yLow = marginY + (pMaxAdj - d.low) / priceRangeAdj * drawH;
+                ctx.strokeStyle = '#666';
                 ctx.lineWidth = 1;
                 ctx.beginPath();
                 ctx.moveTo(x, yHigh);
@@ -586,11 +499,10 @@
                 ctx.stroke();
                 const isUp = d.close >= d.open;
                 ctx.strokeStyle = isUp ? '#26a69a' : '#ef5350';
-                ctx.fillStyle = isUp ? '#26a69a' : '#ef5350';
                 ctx.lineWidth = Math.max(2, candleWidth);
                 const yBody = Math.min(yOpen, yClose);
-                const bodyHeight = Math.abs(yClose - yOpen);
-                if (bodyHeight < 2) {
+                const hBody = Math.abs(yClose - yOpen);
+                if (hBody < 2) {
                     ctx.beginPath();
                     ctx.moveTo(x, yBody - 1);
                     ctx.lineTo(x, yBody + 1);
@@ -598,22 +510,48 @@
                 } else {
                     ctx.beginPath();
                     ctx.moveTo(x, yBody);
-                    ctx.lineTo(x, yBody + bodyHeight);
+                    ctx.lineTo(x, yBody + hBody);
                     ctx.stroke();
                 }
             }
         }
-        function drawMarkers(markers, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, width, height, marginX, marginY, drawHeight) {
-            for (const marker of markers) {
-                const x = marginX + (marker.time - tMin) / timeRange * (width - 2 * marginX);
-                const yBase = marginY + (pMaxAdj - marker.price) / priceRangeAdj * drawHeight;
-                const yMarker = marker.isAbove ? yBase - config.markerOffsetPx : yBase + config.markerOffsetPx;
-                ctx.fillStyle = marker.color;
+
+        function drawMarkers(markers, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH) {
+            for (const m of markers) {
+                const x = marginX + (m.time - tMin) / timeRange * (w - 2 * marginX);
+                const yBase = marginY + (pMaxAdj - m.price) / priceRangeAdj * drawH;
+                const y = m.isAbove ? yBase - config.markerOffsetPx : yBase + config.markerOffsetPx;
+                ctx.fillStyle = m.color;
                 ctx.beginPath();
-                ctx.arc(x, yMarker, 3, 0, 2 * Math.PI);
+                ctx.arc(x, y, 3, 0, 2 * Math.PI);
                 ctx.fill();
             }
         }
+
+        function drawLegendLeft(w, h, topY) {
+            const items = [
+                { color: '#FF00FF', text: 'Strong +' },
+                { color: '#FF0000', text: 'Moderate +' },
+                { color: '#FFFF00', text: 'Weak +' },
+                { color: '#00FFFF', text: 'Strong –' },
+                { color: '#0000FF', text: 'Moderate –' },
+                { color: '#FFFFFF', text: 'Weak –' }
+            ];
+            const startX = 10;
+            const itemH = 20;
+            ctx.font = '11px Arial';
+            ctx.textAlign = 'left';
+            for (let i = 0; i < items.length; i++) {
+                const y = topY + i * itemH;
+                ctx.fillStyle = items[i].color;
+                ctx.beginPath();
+                ctx.arc(startX + 6, y + 6, 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#FFF';
+                ctx.fillText(items[i].text, startX + 16, y + 10);
+            }
+        }
+
         window.onload = init;
     </script>
 </body>
