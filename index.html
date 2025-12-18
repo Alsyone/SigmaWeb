@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Sigma TA Web v1.0</title>
+    <title>SigmaTA Web v1.0</title>
     <style>
         * {
             margin: 0;
@@ -19,6 +19,11 @@
             display: flex;
             flex-direction: column;
         }
+        .main-layout {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
         .header {
             background-color: #1a1a2e;
             padding: 8px 10px;
@@ -26,8 +31,25 @@
             flex-direction: column;
             gap: 6px;
             transition: all 0.3s ease;
+            z-index: 10;
         }
         .header.collapsed {
+            height: 0 !important;
+            min-height: 0 !important;
+            padding: 0 10px !important;
+            opacity: 0;
+            overflow: hidden;
+        }
+        .footer {
+            background-color: #1a1a2e;
+            padding: 8px 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            transition: all 0.3s ease;
+            z-index: 10;
+        }
+        .footer.collapsed {
             height: 0 !important;
             min-height: 0 !important;
             padding: 0 10px !important;
@@ -40,17 +62,11 @@
             gap: 6px;
             flex-wrap: wrap;
         }
-        .menu-row label {
-            font-size: 12px;
-            color: #aaa;
-            min-width: 65px;
-            white-space: nowrap;
-        }
         .symbol-btn, .interval-btn {
             background-color: #2d2d44;
             color: #ccc;
             border: 1px solid #444;
-            padding: 5px 8px;
+            padding: 5px 6px;
             border-radius: 4px;
             font-size: 12px;
             cursor: pointer;
@@ -58,7 +74,7 @@
             align-items: center;
             gap: 4px;
             min-height: 28px;
-            min-width: 42px;
+            min-width: 36px;
             justify-content: center;
         }
         .symbol-btn.active, .interval-btn.active {
@@ -75,15 +91,6 @@
             font-size: 12px;
             min-height: 28px;
         }
-        .header button {
-            background-color: #4CAF50;
-            cursor: pointer;
-            font-weight: bold;
-            min-width: 60px;
-        }
-        .header #resetBtn {
-            background-color: #f44336;
-        }
         .chart-title {
             background-color: #161625;
             padding: 8px 15px;
@@ -96,6 +103,8 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            position: relative;
+            z-index: 5;
         }
         .toggle-menu-btn {
             background: #2d2d44;
@@ -113,18 +122,10 @@
         .toggle-menu-btn:hover {
             background: #3a3a5a;
         }
-        .container {
-            display: flex;
+        .chart-wrapper {
+            position: relative;
             flex: 1;
             overflow: hidden;
-            width: 100%;
-        }
-        .chart-container {
-            flex: 1;
-            position: relative;
-            background-color: #0b0b15;
-            width: 100%;
-            height: 100%;
         }
         canvas {
             display: block;
@@ -141,95 +142,190 @@
             justify-content: space-between;
             flex-wrap: wrap;
             gap: 5px;
+            z-index: 5;
         }
+        .settings-icon {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: #2d2d44;
+            border: 1px solid #444;
+            border-radius: 4px;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 20;
+            font-size: 14px;
+            color: #ccc;
+        }
+        .settings-popup {
+            position: absolute;
+            top: 50px;
+            left: 10px;
+            background: #1a1a2e;
+            border: 1px solid #444;
+            border-radius: 6px;
+            padding: 12px;
+            width: 220px;
+            display: none;
+            z-index: 30;
+            color: white;
+            font-size: 12px;
+        }
+        .settings-popup h3 {
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        .popup-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 4px 0;
+        }
+        .popup-row label {
+            width: 70px;
+            color: #aaa;
+        }
+        .settings-popup input {
+            background: #2d2d44;
+            color: white;
+            border: 1px solid #444;
+            padding: 4px 6px;
+            border-radius: 3px;
+            width: 100px;
+        }
+        .popup-buttons {
+            display: flex;
+            gap: 6px;
+            margin-top: 12px;
+        }
+        .popup-buttons button {
+            flex: 1;
+            padding: 4px;
+            font-size: 11px;
+            border-radius: 3px;
+        }
+        #popupApplyBtn { background-color: #4CAF50; color: white; }
+        #popupResetBtn { background-color: #f44336; color: white; }
+        #popupCloseBtn { background-color: #555; color: white; }
         @media (max-width: 600px) {
-            .chart-container {
+            .chart-wrapper {
                 height: calc(100% - 44px - 30px - 25px);
             }
         }
     </style>
 </head>
 <body>
-    <div class="header" id="mainHeader">
-        <div class="menu-row">
-            <!-- <label>Symbol:</label>  -->
-            <div class="symbol-btn" data-symbol="BTCUSDT">₿ BTC</div>
-            <div class="symbol-btn" data-symbol="ETHUSDT">Ξ ETH</div>
-            <div class="symbol-btn" data-symbol="BNBUSDT">🔶 BNB</div>
-            <div class="symbol-btn" data-symbol="ADAUSDT">🔷 ADA</div>
-            <div class="symbol-btn" data-symbol="SOLUSDT">◎ SOL</div>
-            <div class="symbol-btn" data-symbol="XRPUSDT">✕ XRP</div>
-            <div class="symbol-btn" data-symbol="DOGEUSDT">Ð DOGE</div>
-            <div class="symbol-btn" data-symbol="DOTUSDT">• DOT</div>
-            <div class="symbol-btn" data-symbol="AVAXUSDT">▲ AVAX</div>
-            <div class="symbol-btn" data-symbol="SHIBUSDT">S SHIB</div>
+    <div class="main-layout">
+        <div class="header" id="mainHeader">
+            <div class="menu-row">
+                <div class="symbol-btn" data-symbol="BTCUSDT">₿ BTC</div>
+                <div class="symbol-btn" data-symbol="ETHUSDT">Ξ ETH</div>
+                <div class="symbol-btn" data-symbol="BNBUSDT">🔶 BNB</div>
+                <div class="symbol-btn" data-symbol="ADAUSDT">🔷 ADA</div>
+                <div class="symbol-btn" data-symbol="SOLUSDT">◎ SOL</div>
+                <div class="symbol-btn" data-symbol="XRPUSDT">✕ XRP</div>
+                <div class="symbol-btn" data-symbol="DOGEUSDT">Ð DOGE</div>
+                <div class="symbol-btn" data-symbol="DOTUSDT">• DOT</div>
+                <div class="symbol-btn" data-symbol="AVAXUSDT">▲ AVAX</div>
+                <div class="symbol-btn" data-symbol="SHIBUSDT">S SHIB</div>
+            </div>
         </div>
-        <div class="menu-row">
-            <!-- <label>Interval:</label>  -->
-            <div class="interval-btn" data-interval="1m">1m</div>
-            <div class="interval-btn" data-interval="2m">2m</div>
-            <div class="interval-btn" data-interval="3m">3m</div>
-            <div class="interval-btn" data-interval="5m">5m</div>
-            <div class="interval-btn" data-interval="10m">10m</div>
-            <div class="interval-btn" data-interval="15m">15m</div>
-            <div class="interval-btn" data-interval="20m">20m</div>
-            <div class="interval-btn" data-interval="30m">30m</div>
-            <div class="interval-btn" data-interval="1h">1h</div>
-            <div class="interval-btn" data-interval="2h">2h</div>
-            <div class="interval-btn" data-interval="3h">3h</div>
-            <div class="interval-btn" data-interval="4h">4h</div>
-            <div class="interval-btn" data-interval="6h">6h</div>
-            <div class="interval-btn" data-interval="8h">8h</div>
-            <div class="interval-btn" data-interval="12h">12h</div>
-            <div class="interval-btn" data-interval="1d">1d</div>
-            <div class="interval-btn" data-interval="2d">2d</div>
-            <div class="interval-btn" data-interval="3d">3d</div>
-            <div class="interval-btn" data-interval="1w">1w</div>
-            <div class="interval-btn" data-interval="1M">1M</div>
-            <div class="interval-btn" data-interval="2M">2M</div>
-            <div class="interval-btn" data-interval="3M">3M</div>
-            <div class="interval-btn" data-interval="4M">4M</div>
-            <div class="interval-btn" data-interval="6M">6M</div>
-            <div class="interval-btn" data-interval="1Y">1Y</div> <!-- ДОБАВЛЕНО -->
+
+        <div class="chart-title" id="chartTitle">
+            <span id="chartTitleText">—</span>
+            <div class="toggle-menu-btn" id="toggleMenuBtn">≡</div>
         </div>
-        <div class="menu-row">
-            <label>A:</label>
-            <input type="number" id="analysisLimit" value="10000" min="500" max="20000" step="500">
-            <label>D:</label>
-            <input type="number" id="displayLimit" value="24" min="10" max="1000" step="1">
-            <label>EMA:</label>
-            <input type="number" id="emaPeriod" value="48" min="10" max="500" step="1">
-            <label>W:</label>
-            <input type="number" id="derivWindow" value="2" min="2" max="20" step="1">
-            <label>Upd:</label>
-            <input type="number" id="updateInterval" value="5000" min="1000" max="300000" step="1000">
-            <button id="applyBtn">Apply</button>
-            <button id="resetBtn">Reset</button>
-        </div>
-    </div>
-    <div class="chart-title" id="chartTitle">
-        <span id="chartTitleText">—</span>
-        <div class="toggle-menu-btn" id="toggleMenuBtn">≡</div>
-    </div>
-    <div class="container">
-        <div class="chart-container">
+
+        <div class="chart-wrapper">
             <canvas id="chartCanvas"></canvas>
+            <div class="settings-icon" id="settingsIcon">⚙️</div>
+        </div>
+
+        <div class="status-bar">
+            <div id="lastUpdated">Last Updated: --:--:--</div>
+            <div>Use Wheel to Zoom</div>
+            <div class="toggle-menu-btn" id="toggleFooterBtn">≡</div>
+        </div>
+
+        <div class="footer" id="mainFooter">
+            <div class="menu-row">
+                <div class="interval-btn" data-interval="1m">1m</div>
+                <div class="interval-btn" data-interval="2m">2m</div>
+                <div class="interval-btn" data-interval="3m">3m</div>
+                <div class="interval-btn" data-interval="5m">5m</div>
+                <div class="interval-btn" data-interval="10m">10m</div>
+                <div class="interval-btn" data-interval="15m">15m</div>
+                <div class="interval-btn" data-interval="20m">20m</div>
+                <div class="interval-btn" data-interval="30m">30m</div>
+                <div class="interval-btn" data-interval="1h">1h</div>
+                <div class="interval-btn" data-interval="2h">2h</div>
+                <div class="interval-btn" data-interval="3h">3h</div>
+                <div class="interval-btn" data-interval="4h">4h</div>
+                <div class="interval-btn" data-interval="6h">6h</div>
+                <div class="interval-btn" data-interval="8h">8h</div>
+                <div class="interval-btn" data-interval="12h">12h</div>
+                <div class="interval-btn" data-interval="1d">1d</div>
+                <div class="interval-btn" data-interval="2d">2d</div>
+                <div class="interval-btn" data-interval="3d">3d</div>
+                <div class="interval-btn" data-interval="1w">1w</div>
+                <div class="interval-btn" data-interval="1M">1M</div>
+                <div class="interval-btn" data-interval="2M">2M</div>
+                <div class="interval-btn" data-interval="3M">3M</div>
+                <div class="interval-btn" data-interval="4M">4M</div>
+                <div class="interval-btn" data-interval="6M">6M</div>
+                <div class="interval-btn" data-interval="1Y">1Y</div>
+            </div>
         </div>
     </div>
-    <div class="status-bar">
-        <div id="lastUpdated">Last Updated: --:--:--</div>
-        <div>Use Wheel to Zoom</div>
+
+    <div class="settings-popup" id="settingsPopup">
+        <h3>Settings</h3>
+        <div class="popup-row">
+            <label>A:</label>
+            <input type="number" id="popupAnalysisLimit" value="10000" min="500" max="20000" step="500">
+        </div>
+        <div class="popup-row">
+            <label>D:</label>
+            <input type="number" id="popupDisplayLimit" value="24" min="10" max="1000" step="1">
+        </div>
+        <div class="popup-row">
+            <label>EMA:</label>
+            <input type="number" id="popupEmaPeriod" value="48" min="10" max="500" step="1">
+        </div>
+        <div class="popup-row">
+            <label>W:</label>
+            <input type="number" id="popupDerivWindow" value="2" min="2" max="20" step="1">
+        </div>
+        <div class="popup-row">
+            <label>Upd (ms):</label>
+            <input type="number" id="popupUpdateInterval" value="5000" min="1000" max="300000" step="1000">
+        </div>
+        <div class="popup-row">
+            <label>Font Size:</label>
+            <input type="number" id="popupFontSize" value="11" min="9" max="16" step="1">
+        </div>
+        <div class="popup-buttons">
+            <button id="popupApplyBtn">Apply</button>
+            <button id="popupResetBtn">Reset</button>
+            <button id="popupCloseBtn">Close</button>
+        </div>
     </div>
+
     <script>
         const defaultConfig = {
             symbol: 'BTCUSDT',
             interval: '5m',
             analysisLimit: 10000,
-            displayLimit: 24,
+            displayLimit: 48,
             emaPeriod: 48,
             derivWindow: 2,
             updateIntervalMs: 5000,
-            markerOffsetPx: 10
+            markerOffsetPx: 10,
+            fontSize: 11
         };
 
         const config = { ...defaultConfig };
@@ -248,29 +344,60 @@
         const ctx = canvas.getContext('2d');
         const chartTitleText = document.getElementById('chartTitleText');
         const mainHeader = document.getElementById('mainHeader');
+        const mainFooter = document.getElementById('mainFooter');
         const toggleMenuBtn = document.getElementById('toggleMenuBtn');
+        const toggleFooterBtn = document.getElementById('toggleFooterBtn');
+        const settingsIcon = document.getElementById('settingsIcon');
+        const settingsPopup = document.getElementById('settingsPopup');
+
         const symbolButtons = document.querySelectorAll('.symbol-btn');
         const intervalButtons = document.querySelectorAll('.interval-btn');
-        const analysisLimitInput = document.getElementById('analysisLimit');
-        const displayLimitInput = document.getElementById('displayLimit');
-        const emaPeriodInput = document.getElementById('emaPeriod');
-        const derivWindowInput = document.getElementById('derivWindow');
-        const updateIntervalInput = document.getElementById('updateInterval');
-        const applyBtn = document.getElementById('applyBtn');
-        const resetBtn = document.getElementById('resetBtn');
-        const lastUpdatedDiv = document.getElementById('lastUpdated');
+
+        const popupAnalysisLimit = document.getElementById('popupAnalysisLimit');
+        const popupDisplayLimit = document.getElementById('popupDisplayLimit');
+        const popupEmaPeriod = document.getElementById('popupEmaPeriod');
+        const popupDerivWindow = document.getElementById('popupDerivWindow');
+        const popupUpdateInterval = document.getElementById('popupUpdateInterval');
+        const popupFontSize = document.getElementById('popupFontSize');
+        const popupApplyBtn = document.getElementById('popupApplyBtn');
+        const popupResetBtn = document.getElementById('popupResetBtn');
+        const popupCloseBtn = document.getElementById('popupCloseBtn');
 
         let menuCollapsed = false;
+        let footerCollapsed = true;
 
+        // Верхнее меню
         toggleMenuBtn.addEventListener('click', () => {
             menuCollapsed = !menuCollapsed;
             mainHeader.classList.toggle('collapsed', menuCollapsed);
             toggleMenuBtn.textContent = menuCollapsed ? '≡' : '×';
+            localStorage.setItem('sigma_menu_collapsed', String(menuCollapsed));
             setTimeout(updateDisplay, 150);
         });
 
+        // Нижнее меню
+        toggleFooterBtn.addEventListener('click', () => {
+            footerCollapsed = !footerCollapsed;
+            mainFooter.classList.toggle('collapsed', footerCollapsed);
+            toggleFooterBtn.textContent = footerCollapsed ? '≡' : '×';
+            localStorage.setItem('sigma_footer_collapsed', String(footerCollapsed));
+            setTimeout(updateDisplay, 150);
+        });
+
+        // Попап настроек
+        settingsIcon.addEventListener('click', (e) => {
+            e.stopPropagation();
+            settingsPopup.style.display = settingsPopup.style.display === 'block' ? 'none' : 'block';
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!settingsPopup.contains(e.target) && e.target !== settingsIcon) {
+                settingsPopup.style.display = 'none';
+            }
+        });
+
         const Database = {
-            dbName: 'sigma_candles_v14',
+            dbName: 'sigma_candles_v16',
             initDB: () => {
                 if (!localStorage.getItem(this.dbName)) {
                     localStorage.setItem(this.dbName, JSON.stringify({}));
@@ -298,10 +425,8 @@
             }
         };
 
-        Database.initDB();
-
         const SettingsManager = {
-            key: 'sigma_ta_settings_v14',
+            key: 'sigma_ta_settings_v16',
             load: () => {
                 try {
                     return JSON.parse(localStorage.getItem(this.key)) || config;
@@ -318,7 +443,6 @@
             }
         };
 
-        // === АГРЕГАЦИЯ ===
         function getBaseInterval(target) {
             if (['2m'].includes(target)) return '1m';
             if (['10m', '20m'].includes(target)) return '5m';
@@ -358,7 +482,6 @@
                 return agg;
             }
 
-            // Календарные: 3M, 6M, 1Y
             const groups = {};
             for (const c of candles) {
                 const d = new Date(c.time);
@@ -400,6 +523,30 @@
             loadSettings();
             setupListeners();
             updateButtonStates();
+
+            // Загрузка состояния меню
+            const menuState = localStorage.getItem('sigma_menu_collapsed');
+            if (menuState === 'true' || menuState === null) {
+                menuCollapsed = true;
+                mainHeader.classList.add('collapsed');
+                toggleMenuBtn.textContent = '≡';
+            } else {
+                menuCollapsed = false;
+                mainHeader.classList.remove('collapsed');
+                toggleMenuBtn.textContent = '×';
+            }
+
+            const footerState = localStorage.getItem('sigma_footer_collapsed');
+            if (footerState === 'true' || footerState === null) {
+                footerCollapsed = true;
+                mainFooter.classList.add('collapsed');
+                toggleFooterBtn.textContent = '≡';
+            } else {
+                footerCollapsed = false;
+                mainFooter.classList.remove('collapsed');
+                toggleFooterBtn.textContent = '×';
+            }
+
             loadData();
             setInterval(loadData, config.updateIntervalMs);
             window.addEventListener('resize', () => requestAnimationFrame(updateDisplay));
@@ -411,11 +558,16 @@
         function loadSettings() {
             const saved = SettingsManager.load();
             Object.assign(config, saved);
-            analysisLimitInput.value = config.analysisLimit;
-            displayLimitInput.value = config.displayLimit;
-            emaPeriodInput.value = config.emaPeriod;
-            derivWindowInput.value = config.derivWindow;
-            updateIntervalInput.value = config.updateIntervalMs;
+            loadSettingsIntoPopup();
+        }
+
+        function loadSettingsIntoPopup() {
+            popupAnalysisLimit.value = config.analysisLimit;
+            popupDisplayLimit.value = config.displayLimit;
+            popupEmaPeriod.value = config.emaPeriod;
+            popupDerivWindow.value = config.derivWindow;
+            popupUpdateInterval.value = config.updateIntervalMs;
+            popupFontSize.value = config.fontSize || 11;
         }
 
         function setupListeners() {
@@ -433,22 +585,30 @@
                     applySettings();
                 });
             });
-            applyBtn.addEventListener('click', applySettings);
-            resetBtn.addEventListener('click', resetSettings);
-            [analysisLimitInput, displayLimitInput, emaPeriodInput, derivWindowInput, updateIntervalInput]
-                .forEach(el => el.addEventListener('change', applySettings));
-        }
 
-        function resetSettings() {
-            Object.assign(config, defaultConfig);
-            analysisLimitInput.value = config.analysisLimit;
-            displayLimitInput.value = config.displayLimit;
-            emaPeriodInput.value = config.emaPeriod;
-            derivWindowInput.value = config.derivWindow;
-            updateIntervalInput.value = config.updateIntervalMs;
-            SettingsManager.save();
-            updateButtonStates();
-            loadData();
+            popupApplyBtn.addEventListener('click', () => {
+                config.analysisLimit = parseInt(popupAnalysisLimit.value);
+                config.displayLimit = parseInt(popupDisplayLimit.value);
+                config.emaPeriod = parseInt(popupEmaPeriod.value);
+                config.derivWindow = parseInt(popupDerivWindow.value);
+                config.updateIntervalMs = parseInt(popupUpdateInterval.value);
+                config.fontSize = parseInt(popupFontSize.value);
+                SettingsManager.save();
+                loadData();
+                settingsPopup.style.display = 'none';
+            });
+
+            popupResetBtn.addEventListener('click', () => {
+                Object.assign(config, defaultConfig);
+                loadSettingsIntoPopup();
+                SettingsManager.save();
+                loadData();
+                settingsPopup.style.display = 'none';
+            });
+
+            popupCloseBtn.addEventListener('click', () => {
+                settingsPopup.style.display = 'none';
+            });
         }
 
         function updateButtonStates() {
@@ -461,11 +621,6 @@
         }
 
         function applySettings() {
-            config.analysisLimit = parseInt(analysisLimitInput.value);
-            config.displayLimit = parseInt(displayLimitInput.value);
-            config.emaPeriod = parseInt(emaPeriodInput.value);
-            config.derivWindow = parseInt(derivWindowInput.value);
-            config.updateIntervalMs = parseInt(updateIntervalInput.value);
             SettingsManager.save();
             document.title = `Sigma TA Web - ${config.symbol} (${config.interval})`;
             loadData();
@@ -476,7 +631,7 @@
             newVal = Math.max(10, Math.min(1000, newVal));
             if (newVal !== config.displayLimit) {
                 config.displayLimit = newVal;
-                displayLimitInput.value = newVal;
+                SettingsManager.save();
                 updateDisplay();
             }
         }
@@ -573,14 +728,14 @@
             currentPrice = fullCandleData[fullCandleData.length - 1].close;
             lastUpdateTime = new Date();
             const up = fullCandleData.length > 1 && currentPrice >= fullCandleData[fullCandleData.length - 2].close;
-            const color = up ? '#26a69a' : '#ef5350';
+            const color = up ? '#008000' : '#800000';
             const prec = precisionMap[config.symbol] ?? 2;
             const formattedPrice = currentPrice.toLocaleString('en', {
                 minimumFractionDigits: prec,
                 maximumFractionDigits: prec
             });
             chartTitleText.innerHTML = `${config.symbol} (${config.interval}) &nbsp; <span style="color:${color}">$${formattedPrice}</span>`;
-            lastUpdatedDiv.textContent = `Last Updated: ${formatTime(lastUpdateTime)}`;
+            document.getElementById('lastUpdated').textContent = `Last Updated: ${formatTime(lastUpdateTime)}`;
         }
 
         function getIntervalSeconds(interval) {
@@ -669,23 +824,17 @@
         function drawChart() {
             if (!fullCandleData.length) return;
 
-            const extraCandles = 4;
-            const extendedData = [...fullCandleData];
-            const last = fullCandleData[fullCandleData.length - 1];
-            const sec = getIntervalSeconds(config.interval);
-            for (let i = 1; i <= extraCandles; i++) {
-                extendedData.push({
-                    time: last.time + i * sec * 1000,
-                    open: last.close,
-                    high: last.close,
-                    low: last.close,
-                    close: last.close
-                });
-            }
-
-            const total = config.displayLimit + extraCandles;
-            const displayData = extendedData.slice(-total).slice(0, -extraCandles);
+            const displayData = fullCandleData.slice(-config.displayLimit);
             if (displayData.length === 0) return;
+
+            const futureCandles = 5;
+            const intervalSec = getIntervalSeconds(config.interval);
+            const intervalMs = intervalSec * 1000;
+            const lastTime = displayData[displayData.length - 1].time;
+
+            const tMin = displayData[0].time;
+            const tMax = lastTime + futureCandles * intervalMs;
+            const timeRange = tMax - tMin;
 
             const visibleTimes = new Set(displayData.map(d => d.time));
             const visibleMarkers = markers.filter(m => visibleTimes.has(m.time));
@@ -699,11 +848,8 @@
             ctx.fillStyle = '#0b0b15';
             ctx.fillRect(0, 0, w, h);
 
-            const times = displayData.map(d => d.time);
             const lows = displayData.map(d => d.low);
             const highs = displayData.map(d => d.high);
-            const tMin = Math.min(...times);
-            const tMax = Math.max(...times);
             const pMin = Math.min(...lows);
             const pMax = Math.max(...highs);
             const priceRange = pMax - pMin;
@@ -711,7 +857,6 @@
             const pMinAdj = pMin - padding;
             const pMaxAdj = pMax + padding;
             const priceRangeAdj = pMaxAdj - pMinAdj;
-            const timeRange = tMax - tMin;
 
             drawPriceGrid(pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH);
             if (currentPrice !== null) {
@@ -741,7 +886,7 @@
                 ctx.lineTo(w - marginX, y);
                 ctx.stroke();
                 ctx.fillStyle = '#AAA';
-                ctx.font = '10px Arial';
+                ctx.font = `${config.fontSize || 11}px Arial`;
                 const prec = precisionMap[config.symbol] ?? 2;
                 const formatted = price.toLocaleString('en', {
                     minimumFractionDigits: Math.min(prec, 4),
@@ -757,7 +902,7 @@
             let color = '#00FFFF';
             if (fullCandleData.length > 1) {
                 const prev = fullCandleData[fullCandleData.length - 2].close;
-                color = price >= prev ? '#26a69a' : '#ef5350';
+                color = price >= prev ? '#00FF00' : '#FF0000';
             }
             ctx.strokeStyle = color;
             ctx.lineWidth = 1;
@@ -771,11 +916,11 @@
                 minimumFractionDigits: prec,
                 maximumFractionDigits: prec
             });
-            ctx.font = 'bold 10px Arial';
-            ctx.fillText(`$${formatted}`, w - marginX + (w > 500 ? 10 : 2), y - 2);
+            ctx.font = `bold ${config.fontSize || 11}px Arial`;
+            ctx.fillText(`${formatted}`, w - marginX + (w > 500 ? 10 : 2), y - 2);
         }
 
-        function drawAdaptiveTimeGrid(data, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH) {
+        function drawAdaptiveTimeGrid(displayData, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH) {
             const interval = config.interval;
             let majorStepMs = 0;
             let formatLabel = (ts) => '';
@@ -796,9 +941,7 @@
                 majorStepMs = 365.25 * 86400 * 1000;
                 formatLabel = (ts) => `${new Date(ts).getFullYear()}`;
             } else if (interval === '1Y') {
-                // Годовой: деления каждые 4 года, начиная со следующего за високосным
                 const startYear = new Date(tMin).getUTCFullYear();
-                // Найти ближайший год ≥ startYear, следующий за високосным
                 let firstMarkYear = startYear;
                 while (true) {
                     const prev = firstMarkYear - 1;
@@ -807,12 +950,10 @@
                     }
                     firstMarkYear++;
                     if (firstMarkYear > startYear + 10) {
-                        // fallback, если не нашли
                         firstMarkYear = startYear + (4 - (startYear % 4));
                         break;
                     }
                 }
-                // Отображаем линии
                 const years = [];
                 for (let y = firstMarkYear; y <= new Date(tMin + timeRange).getUTCFullYear() + 4; y += 4) {
                     const ts = Date.UTC(y, 0, 1);
@@ -830,7 +971,7 @@
                     ctx.stroke();
                     ctx.setLineDash([]);
                     ctx.fillStyle = '#888CCC';
-                    ctx.font = '10px Arial';
+                    ctx.font = `${config.fontSize || 11}px Arial`;
                     ctx.textAlign = 'center';
                     ctx.fillText(`${new Date(ts).getUTCFullYear()}`, x, h - 12);
                 }
@@ -855,28 +996,31 @@
                 ctx.stroke();
                 ctx.setLineDash([]);
                 ctx.fillStyle = '#888CCC';
-                ctx.font = '10px Arial';
+                ctx.font = `${config.fontSize || 11}px Arial`;
                 ctx.textAlign = 'center';
                 ctx.fillText(formatLabel(t), x, h - 12);
             }
         }
 
-        function drawCandles(data, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH) {
-            const candleWidth = Math.max(1, (w - 2 * marginX) / data.length * 0.8);
-            for (const d of data) {
+        function drawCandles(displayData, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH) {
+            const candleWidth = Math.max(1, (w - 2 * marginX) / displayData.length * 0.7);
+            for (const d of displayData) {
                 const x = marginX + (d.time - tMin) / timeRange * (w - 2 * marginX);
                 const yOpen = marginY + (pMaxAdj - d.open) / priceRangeAdj * drawH;
                 const yClose = marginY + (pMaxAdj - d.close) / priceRangeAdj * drawH;
                 const yHigh = marginY + (pMaxAdj - d.high) / priceRangeAdj * drawH;
                 const yLow = marginY + (pMaxAdj - d.low) / priceRangeAdj * drawH;
-                ctx.strokeStyle = '#666';
+                // ctx.strokeStyle = '#666';
+				const isUp = d.close >= d.open;
+                ctx.strokeStyle = isUp ? '#008000' : '#800000	';
+
                 ctx.lineWidth = 1;
                 ctx.beginPath();
                 ctx.moveTo(x, yHigh);
                 ctx.lineTo(x, yLow);
                 ctx.stroke();
-                const isUp = d.close >= d.open;
-                ctx.strokeStyle = isUp ? '#26a69a' : '#ef5350';
+                // const isUp = d.close >= d.open;
+                // ctx.strokeStyle = isUp ? '#26a69a' : '#ef5350';
                 ctx.lineWidth = Math.max(1.5, candleWidth);
                 const yBody = Math.min(yOpen, yClose);
                 const hBody = Math.abs(yClose - yOpen);
@@ -918,7 +1062,7 @@
             ];
             const totalWidth = items.reduce((sum, item) => sum + ctx.measureText(item.text).width + 30, 0);
             const startX = w / 2 - totalWidth / 2;
-            ctx.font = '11px Arial';
+            ctx.font = `${config.fontSize || 11}px Arial`;
             ctx.textAlign = 'left';
             let xOffset = startX;
             for (let i = 0; i < items.length; i++) {
