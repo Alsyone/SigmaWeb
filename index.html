@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Sigma TA Web</title>
     <style>
         * {
@@ -21,107 +21,174 @@
         }
         .header {
             background-color: #1a1a2e;
-            padding: 10px 20px;
+            padding: 8px 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            transition: all 0.3s ease;
+        }
+        .header.collapsed {
+            height: 0 !important;
+            min-height: 0 !important;
+            padding: 0 10px !important;
+            opacity: 0;
+            overflow: hidden;
+        }
+        .menu-row {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 6px;
             flex-wrap: wrap;
         }
-        .header label {
+        .menu-row label {
             font-size: 12px;
             color: #aaa;
+            min-width: 65px;
+            white-space: nowrap;
         }
-        .header select, .header input, .header button {
+        .symbol-btn, .interval-btn {
+            background-color: #2d2d44;
+            color: #ccc;
+            border: 1px solid #444;
+            padding: 5px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            min-height: 28px;
+            min-width: 42px;
+            justify-content: center;
+        }
+        .symbol-btn.active, .interval-btn.active {
+            background-color: #4a4a6a;
+            color: white;
+            border-color: #6a6a9a;
+        }
+        .header input, .header button {
             background-color: #2d2d44;
             color: white;
             border: 1px solid #444;
-            padding: 5px 10px;
+            padding: 5px 8px;
             border-radius: 4px;
             font-size: 12px;
+            min-height: 28px;
         }
         .header button {
             background-color: #4CAF50;
             cursor: pointer;
             font-weight: bold;
-        }
-        .header button:hover {
-            background-color: #45a049;
+            min-width: 60px;
         }
         .chart-title {
             background-color: #161625;
-            padding: 8px 20px;
-            font-size: 20px;
+            padding: 8px 15px;
+            font-size: 18px;
             font-weight: bold;
             display: flex;
-            justify-content: flex-start; /* ← выравнивание слева */
+            justify-content: space-between;
+            align-items: center;
             border-bottom: 1px solid #333;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .toggle-menu-btn {
+            background: #2d2d44;
+            border: 1px solid #444;
+            color: #ccc;
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .toggle-menu-btn:hover {
+            background: #3a3a5a;
         }
         .container {
             display: flex;
             flex: 1;
             overflow: hidden;
+            width: 100%;
         }
         .chart-container {
             flex: 1;
             position: relative;
             background-color: #0b0b15;
+            width: 100%;
+            height: 100%;
         }
         canvas {
             display: block;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
         }
         .status-bar {
             background-color: #1a1a2e;
-            padding: 5px 15px;
-            font-size: 12px;
+            padding: 4px 10px;
+            font-size: 11px;
             color: #aaa;
             display: flex;
             justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 5px;
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <label>Symbol:</label>
-        <select id="symbolSelect">
-            <option value="BTCUSDT">BTCUSDT</option>
-            <option value="ETHUSDT">ETHUSDT</option>
-            <option value="BNBUSDT">BNBUSDT</option>
-            <option value="ADAUSDT">ADAUSDT</option>
-            <option value="SOLUSDT">SOLUSDT</option>
-        </select>
-        <label>Interval:</label>
-        <select id="intervalSelect">
-            <option value="1m">1m</option>
-            <option value="3m">3m</option>
-            <option value="5m">5m</option>
-            <option value="15m">15m</option>
-            <option value="30m">30m</option>
-            <option value="1h">1h</option>
-            <option value="2h">2h</option>
-            <option value="3h">3h</option>
-            <option value="4h">4h</option>
-            <option value="6h">6h</option>
-            <option value="8h">8h</option>
-            <option value="12h">12h</option>
-            <option value="1d">1d</option>
-            <option value="2d">2d</option>
-            <option value="3d">3d</option>
-            <option value="1w">1w</option>
-            <option value="1M">1M</option>
-        </select>
-        <label>Analysis:</label>
-        <input type="number" id="analysisLimit" value="10000" min="500" max="20000" step="500" style="width: 75px;">
-        <label>Display:</label>
-        <input type="number" id="displayLimit" value="500" min="10" max="1000" step="10" style="width: 65px;">
-        <label>EMA Period:</label>
-        <input type="number" id="emaPeriod" value="96" min="10" max="500" step="10" style="width: 55px;">
-        <label>Deriv Win:</label>
-        <input type="number" id="derivWindow" value="4" min="2" max="20" step="1" style="width: 45px;">
-        <label>Update (ms):</label>
-        <input type="number" id="updateInterval" value="5000" min="1000" max="300000" step="1000" style="width: 75px;">
-        <button id="applyBtn">Apply</button>
+    <div class="header" id="mainHeader">
+        <div class="menu-row">
+            <label>Symbol:</label>
+            <div class="symbol-btn active" data-symbol="BTCUSDT">в‚ї BTC</div>
+            <div class="symbol-btn" data-symbol="ETHUSDT">Оћ ETH</div>
+            <div class="symbol-btn" data-symbol="BNBUSDT">рџ”¶ BNB</div>
+            <div class="symbol-btn" data-symbol="ADAUSDT">рџ”· ADA</div>
+            <div class="symbol-btn" data-symbol="SOLUSDT">в—Ћ SOL</div>
+        </div>
+        <div class="menu-row">
+            <label>Interval:</label>
+            <div class="interval-btn" data-interval="1m">1m</div>
+            <div class="interval-btn" data-interval="2m">2m</div>
+            <div class="interval-btn" data-interval="3m">3m</div>
+            <div class="interval-btn" data-interval="5m">5m</div>
+            <div class="interval-btn" data-interval="15m">15m</div>
+            <div class="interval-btn" data-interval="30m">30m</div>
+            <div class="interval-btn" data-interval="1h">1h</div>
+            <div class="interval-btn" data-interval="2h">2h</div>
+            <div class="interval-btn" data-interval="4h">4h</div>
+            <div class="interval-btn" data-interval="6h">6h</div>
+            <div class="interval-btn" data-interval="8h">8h</div>
+            <div class="interval-btn" data-interval="12h">12h</div>
+            <div class="interval-btn active" data-interval="1d">1d</div>
+            <div class="interval-btn" data-interval="2d">2d</div>
+            <div class="interval-btn" data-interval="3d">3d</div>
+            <div class="interval-btn" data-interval="1w">1w</div>
+            <div class="interval-btn" data-interval="1M">1M</div>
+        </div>
+        <div class="menu-row">
+            <label>A:</label>
+            <input type="number" id="analysisLimit" value="10000" min="500" max="20000" step="500">
+            <label>D:</label>
+            <input type="number" id="displayLimit" value="500" min="10" max="1000" step="10">
+            <label>EMA:</label>
+            <input type="number" id="emaPeriod" value="96" min="10" max="500" step="10">
+            <label>W:</label>
+            <input type="number" id="derivWindow" value="4" min="2" max="20" step="1">
+            <label>Upd:</label>
+            <input type="number" id="updateInterval" value="5000" min="1000" max="300000" step="1000">
+            <button id="applyBtn">Apply</button>
+        </div>
     </div>
-    <div class="chart-title" id="chartTitle">—</div>
+    <div class="chart-title" id="chartTitle">
+        <span id="chartTitleText">вЂ”</span>
+        <div class="toggle-menu-btn" id="toggleMenuBtn">в‰Ў</div>
+    </div>
     <div class="container">
         <div class="chart-container">
             <canvas id="chartCanvas"></canvas>
@@ -129,12 +196,12 @@
     </div>
     <div class="status-bar">
         <div id="lastUpdated">Last Updated: --:--:--</div>
-        <div><small>Use +/- keys or Shift+Wheel to zoom candles</small></div>
+        <div>Use Wheel to Zoom</div>
     </div>
     <script>
         const config = {
             symbol: 'BTCUSDT',
-            interval: '1h',
+            interval: '1d',
             analysisLimit: 10000,
             displayLimit: 500,
             emaPeriod: 96,
@@ -150,10 +217,12 @@
 
         const canvas = document.getElementById('chartCanvas');
         const ctx = canvas.getContext('2d');
-        const chartTitleDiv = document.getElementById('chartTitle');
+        const chartTitleText = document.getElementById('chartTitleText');
+        const mainHeader = document.getElementById('mainHeader');
+        const toggleMenuBtn = document.getElementById('toggleMenuBtn');
 
-        const symbolSelect = document.getElementById('symbolSelect');
-        const intervalSelect = document.getElementById('intervalSelect');
+        const symbolButtons = document.querySelectorAll('.symbol-btn');
+        const intervalButtons = document.querySelectorAll('.interval-btn');
         const analysisLimitInput = document.getElementById('analysisLimit');
         const displayLimitInput = document.getElementById('displayLimit');
         const emaPeriodInput = document.getElementById('emaPeriod');
@@ -162,8 +231,18 @@
         const applyBtn = document.getElementById('applyBtn');
         const lastUpdatedDiv = document.getElementById('lastUpdated');
 
+        let menuCollapsed = false;
+        toggleMenuBtn.addEventListener('click', () => {
+            menuCollapsed = !menuCollapsed;
+            mainHeader.classList.toggle('collapsed', menuCollapsed);
+            toggleMenuBtn.textContent = menuCollapsed ? 'в‰Ў' : 'Г—';
+            setTimeout(updateDisplay, 150);
+        });
+
+        // ... РѕСЃС‚Р°Р»СЊРЅРѕР№ РєРѕРґ Р±РµР· РёР·РјРµРЅРµРЅРёР№ РґРѕ drawAdaptiveTimeGrid ...
+
         const Database = {
-            dbName: 'sigma_candles_v5',
+            dbName: 'sigma_candles_v11',
             initDB: () => {
                 if (!localStorage.getItem(this.dbName)) {
                     localStorage.setItem(this.dbName, JSON.stringify({}));
@@ -194,7 +273,7 @@
         Database.initDB();
 
         const SettingsManager = {
-            key: 'sigma_ta_settings_v5',
+            key: 'sigma_ta_settings_v11',
             load: () => {
                 try {
                     return JSON.parse(localStorage.getItem(this.key)) || config;
@@ -214,9 +293,10 @@
         function init() {
             loadSettings();
             setupListeners();
+            updateButtonStates();
             loadData();
             setInterval(loadData, config.updateIntervalMs);
-            window.addEventListener('resize', updateDisplay);
+            window.addEventListener('resize', () => requestAnimationFrame(updateDisplay));
             window.addEventListener('keydown', handleKeyDown);
             canvas.addEventListener('wheel', handleWheel, { passive: false });
             updateDisplay();
@@ -225,8 +305,6 @@
         function loadSettings() {
             const saved = SettingsManager.load();
             Object.assign(config, saved);
-            symbolSelect.value = config.symbol;
-            intervalSelect.value = config.interval;
             analysisLimitInput.value = config.analysisLimit;
             displayLimitInput.value = config.displayLimit;
             emaPeriodInput.value = config.emaPeriod;
@@ -235,14 +313,35 @@
         }
 
         function setupListeners() {
-            const inputs = [symbolSelect, intervalSelect, analysisLimitInput, displayLimitInput, emaPeriodInput, derivWindowInput, updateIntervalInput];
+            symbolButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    config.symbol = btn.dataset.symbol;
+                    updateButtonStates();
+                    applySettings();
+                });
+            });
+            intervalButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    config.interval = btn.dataset.interval;
+                    updateButtonStates();
+                    applySettings();
+                });
+            });
             applyBtn.addEventListener('click', applySettings);
+            const inputs = [analysisLimitInput, displayLimitInput, emaPeriodInput, derivWindowInput, updateIntervalInput];
             inputs.forEach(el => el.addEventListener('change', applySettings));
         }
 
+        function updateButtonStates() {
+            symbolButtons.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.symbol === config.symbol);
+            });
+            intervalButtons.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.interval === config.interval);
+            });
+        }
+
         function applySettings() {
-            config.symbol = symbolSelect.value;
-            config.interval = intervalSelect.value;
             config.analysisLimit = parseInt(analysisLimitInput.value);
             config.displayLimit = parseInt(displayLimitInput.value);
             config.emaPeriod = parseInt(emaPeriodInput.value);
@@ -265,16 +364,15 @@
 
         function handleKeyDown(e) {
             if (e.key === '+' || e.key === '=' || e.key === 'Add') {
-                adjustDisplayLimit(-10);
+                adjustDisplayLimit(-5);
                 e.preventDefault();
             } else if (e.key === '-' || e.key === '_' || e.key === 'Subtract') {
-                adjustDisplayLimit(10);
+                adjustDisplayLimit(5);
                 e.preventDefault();
             }
         }
 
         function handleWheel(e) {
-            if (!e.shiftKey) return;
             e.preventDefault();
             const delta = e.deltaY > 0 ? 10 : -10;
             adjustDisplayLimit(delta);
@@ -343,15 +441,16 @@
             currentPrice = fullCandleData[fullCandleData.length - 1].close;
             lastUpdateTime = new Date();
             const up = fullCandleData.length > 1 && currentPrice >= fullCandleData[fullCandleData.length - 2].close;
-            chartTitleDiv.innerHTML = `${config.symbol} (${config.interval}) &nbsp; <span style="color:${up ? '#26a69a' : '#ef5350'}">$${currentPrice.toLocaleString()}</span>`;
+            const color = up ? '#26a69a' : '#ef5350';
+            chartTitleText.innerHTML = `${config.symbol} (${config.interval}) &nbsp; <span style="color:${color}">$${currentPrice.toLocaleString()}</span>`;
             lastUpdatedDiv.textContent = `Last Updated: ${formatTime(lastUpdateTime)}`;
         }
 
         function getIntervalSeconds(interval) {
             const map = {
-                '1m':60,'3m':180,'5m':300,'15m':900,'30m':1800,
-                '1h':3600,'2h':7200,'3h':10800,'4h':14400,'6h':21600,'8h':28800,'12h':43200,
-                '1d':86400,'2d':172800,'3d':259200,'1w':604800,'1M':2592000
+                '1m':60, '2m':120, '3m':180, '5m':300, '15m':900, '30m':1800,
+                '1h':3600, '2h':7200, '4h':14400, '6h':21600, '8h':28800, '12h':43200,
+                '1d':86400, '2d':172800, '3d':259200, '1w':604800, '1M':2592000
             };
             return map[interval] || 3600;
         }
@@ -419,30 +518,32 @@
         }
 
         function updateDisplay() {
-            const cont = canvas.parentElement;
-            canvas.width = cont.clientWidth;
-            canvas.height = cont.clientHeight;
-            drawChart();
+            const container = canvas.parentElement;
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            if (width > 0 && height > 0) {
+                canvas.width = width;
+                canvas.height = height;
+                drawChart();
+            }
         }
 
         function drawChart() {
             if (!fullCandleData.length) return;
-
             const displayData = fullCandleData.slice(-config.displayLimit);
+            if (displayData.length === 0) return;
+
             const visibleTimes = new Set(displayData.map(d => d.time));
             const visibleMarkers = markers.filter(m => visibleTimes.has(m.time));
 
             const w = canvas.width;
             const h = canvas.height;
-            const marginX = 70;
-            const marginY = 50;
-            const drawW = w - 2 * marginX;
+            const marginX = Math.max(50, Math.min(70, w * 0.1));
+            const marginY = 40;
             const drawH = h - 2 * marginY;
 
             ctx.fillStyle = '#0b0b15';
             ctx.fillRect(0, 0, w, h);
-
-            if (displayData.length === 0) return;
 
             const times = displayData.map(d => d.time);
             const lows = displayData.map(d => d.low);
@@ -459,11 +560,10 @@
             const timeRange = tMax - tMin;
 
             drawPriceGrid(pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH);
-            // ← ВОТ ОН: индикатор последней свечи
             if (currentPrice !== null) {
                 drawCurrentPriceLine(currentPrice, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH);
             }
-            drawDailyBoundaries(displayData, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH);
+            drawAdaptiveTimeGrid(displayData, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH);
             drawCandles(displayData, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH);
             drawMarkers(visibleMarkers, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH);
             drawLegendLeft(w, h, marginY);
@@ -488,11 +588,10 @@
                 ctx.stroke();
                 ctx.fillStyle = '#AAA';
                 ctx.font = '10px Arial';
-                ctx.fillText(price.toLocaleString(), w - marginX + 10, y + 4);
+                ctx.fillText(price.toLocaleString(), w - marginX + (w > 500 ? 10 : 2), y + 4);
             }
         }
 
-        // ← ВОТ ОНА: функция индикатора последней свечи
         function drawCurrentPriceLine(price, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH) {
             const y = marginY + (pMaxAdj - price) / priceRangeAdj * drawH;
             if (y < marginY || y > h - marginY) return;
@@ -508,33 +607,91 @@
             ctx.lineTo(w - marginX, y);
             ctx.stroke();
             ctx.fillStyle = color;
-            ctx.font = 'bold 11px Arial';
-            ctx.textAlign = 'left';
-            ctx.fillText(`$${price.toLocaleString()}`, w - marginX + 10, y - 2);
+            ctx.font = 'bold 10px Arial';
+            ctx.fillText(`$${price.toLocaleString()}`, w - marginX + (w > 500 ? 10 : 2), y - 2);
         }
 
-        function drawDailyBoundaries(data, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH) {
-            const seen = new Set();
-            for (const d of data) {
-                const dt = new Date(d.time);
-                const key = dt.toDateString();
-                if (seen.has(key)) continue;
-                seen.add(key);
-                const dayStart = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime();
-                if (dayStart < tMin || dayStart > tMin + timeRange) continue;
-                const x = marginX + (dayStart - tMin) / timeRange * (w - 2 * marginX);
+        // === РРЎРџР РђР’Р›Р•РќРћ: 1d в†’ РЅРµРґРµР»Рё ===
+        function drawAdaptiveTimeGrid(data, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH) {
+            const interval = config.interval;
+            let majorStepMs = 0;
+            let formatLabel = (ts) => '';
+
+            if (['1m', '2m'].includes(interval)) {
+                // 1m, 2m в†’ РїРѕ С‡Р°СЃР°Рј
+                majorStepMs = 3600 * 1000;
+                formatLabel = (ts) => {
+                    const d = new Date(ts);
+                    return `${d.getHours()}:00`;
+                };
+            } else if (['3m', '5m'].includes(interval)) {
+                // 3m, 5m в†’ РїРѕ С‡Р°СЃР°Рј
+                majorStepMs = 3600 * 1000;
+                formatLabel = (ts) => {
+                    const d = new Date(ts);
+                    return `${d.getHours()}:00`;
+                };
+            } else if (['15m', '30m', '1h'].includes(interval)) {
+                // 15mвЂ“1h в†’ РїРѕ СЃСѓС‚РєР°Рј
+                majorStepMs = 86400 * 1000;
+                formatLabel = (ts) => {
+                    const d = new Date(ts);
+                    return `${d.getDate()}`;
+                };
+            } else if (['2h', '4h', '6h', '8h', '12h'].includes(interval)) {
+                // 2hвЂ“12h в†’ РїРѕ СЃСѓС‚РєР°Рј
+                majorStepMs = 86400 * 1000;
+                formatLabel = (ts) => {
+                    const d = new Date(ts);
+                    return `${d.getDate()}`;
+                };
+            } else if (['1d', '2d', '3d'].includes(interval)) {
+                // 1d, 2d, 3d в†’ РїРѕ РЅРµРґРµР»СЏРј
+                majorStepMs = 7 * 86400 * 1000;
+                formatLabel = (ts) => {
+                    const d = new Date(ts);
+                    return `${d.getMonth()+1}/${d.getDate()}`;
+                };
+            } else if (interval === '1w') {
+                // 1w в†’ РїРѕ РјРµСЃСЏС†Р°Рј
+                majorStepMs = 30.44 * 86400 * 1000;
+                formatLabel = (ts) => {
+                    const d = new Date(ts);
+                    return `${d.getMonth()+1}/${String(d.getFullYear()).slice(-2)}`;
+                };
+            } else if (interval === '1M') {
+                // 1M в†’ РїРѕ РіРѕРґР°Рј
+                majorStepMs = 365.25 * 86400 * 1000;
+                formatLabel = (ts) => {
+                    const d = new Date(ts);
+                    return `${d.getFullYear()}`;
+                };
+            } else {
+                majorStepMs = 86400 * 1000;
+                formatLabel = (ts) => `${new Date(ts).getDate()}`;
+            }
+
+            const firstTs = tMin;
+            let startMajor = Math.floor(firstTs / majorStepMs) * majorStepMs;
+
+            for (let t = startMajor; t <= tMin + timeRange + majorStepMs; t += majorStepMs) {
+                if (t < tMin - majorStepMs || t > tMin + timeRange + majorStepMs) continue;
+                const x = marginX + (t - tMin) / timeRange * (w - 2 * marginX);
+                if (x < marginX || x > w - marginX) continue;
+
                 ctx.strokeStyle = '#555777';
                 ctx.lineWidth = 1;
-                ctx.setLineDash([5,5]);
+                ctx.setLineDash([4, 4]);
                 ctx.beginPath();
                 ctx.moveTo(x, marginY);
                 ctx.lineTo(x, h - marginY);
                 ctx.stroke();
                 ctx.setLineDash([]);
+
                 ctx.fillStyle = '#888CCC';
                 ctx.font = '10px Arial';
                 ctx.textAlign = 'center';
-                ctx.fillText(`${dt.getMonth()+1}-${dt.getDate()}`, x, h - 15);
+                ctx.fillText(formatLabel(t), x, h - 12);
             }
         }
 
@@ -554,7 +711,7 @@
                 ctx.stroke();
                 const isUp = d.close >= d.open;
                 ctx.strokeStyle = isUp ? '#26a69a' : '#ef5350';
-                ctx.lineWidth = Math.max(2, candleWidth);
+                ctx.lineWidth = Math.max(1.5, candleWidth);
                 const yBody = Math.min(yOpen, yClose);
                 const hBody = Math.abs(yClose - yOpen);
                 if (hBody < 2) {
@@ -578,19 +735,20 @@
                 const y = m.isAbove ? yBase - config.markerOffsetPx : yBase + config.markerOffsetPx;
                 ctx.fillStyle = m.color;
                 ctx.beginPath();
-                ctx.arc(x, y, 3, 0, 2 * Math.PI);
+                ctx.arc(x, y, w > 400 ? 3 : 2, 0, 2 * Math.PI);
                 ctx.fill();
             }
         }
 
         function drawLegendLeft(w, h, topY) {
+            if (w < 400) return;
             const items = [
                 { color: '#FF00FF', text: 'Strong +' },
                 { color: '#FF0000', text: 'Moderate +' },
                 { color: '#FFFF00', text: 'Weak +' },
-                { color: '#00FFFF', text: 'Strong –' },
-                { color: '#0000FF', text: 'Moderate –' },
-                { color: '#FFFFFF', text: 'Weak –' }
+                { color: '#00FFFF', text: 'Strong вЂ“' },
+                { color: '#0000FF', text: 'Moderate вЂ“' },
+                { color: '#FFFFFF', text: 'Weak вЂ“' }
             ];
             const startX = 10;
             const itemH = 20;
