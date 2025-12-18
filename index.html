@@ -126,7 +126,7 @@
 			min-height: 0; /* важно для корректного сжатия */
             position: relative;
             flex: 1;
-            overflow: hidden;
+            overflow: visible;
 			z-index: 1;
         }
         canvas {
@@ -238,10 +238,12 @@
             <div class="toggle-menu-btn" id="toggleMenuBtn">≡</div>
         </div>
 
-        <div class="chart-wrapper">
-            <canvas id="chartCanvas"></canvas>
-            <div class="settings-icon" id="settingsIcon">⚙️</div>
-        </div>
+		<div class="chart-wrapper">
+		  <div style="position: absolute; inset: 0;">
+			<canvas id="chartCanvas" style="display: block; width: 100%; height: 100%;"></canvas>
+		  </div>
+		  <div class="settings-icon" id="settingsIcon">⚙️</div>
+		</div>
 
         <div class="status-bar">
             <div id="lastUpdated">Last Updated: --:--:--</div>
