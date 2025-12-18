@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Sigma TA Web</title>
+    <title>Sigma TA Web v1.0</title>
     <style>
         * {
             margin: 0;
@@ -81,6 +81,9 @@
             font-weight: bold;
             min-width: 60px;
         }
+        .header #resetBtn {
+            background-color: #f44336;
+        }
         .chart-title {
             background-color: #161625;
             padding: 8px 15px;
@@ -139,17 +142,27 @@
             flex-wrap: wrap;
             gap: 5px;
         }
+        @media (max-width: 600px) {
+            .chart-container {
+                height: calc(100% - 44px - 30px - 25px);
+            }
+        }
     </style>
 </head>
 <body>
     <div class="header" id="mainHeader">
         <div class="menu-row">
             <label>Symbol:</label>
-            <div class="symbol-btn active" data-symbol="BTCUSDT">₿ BTC</div>
+            <div class="symbol-btn" data-symbol="BTCUSDT">₿ BTC</div>
             <div class="symbol-btn" data-symbol="ETHUSDT">Ξ ETH</div>
             <div class="symbol-btn" data-symbol="BNBUSDT">🔶 BNB</div>
             <div class="symbol-btn" data-symbol="ADAUSDT">🔷 ADA</div>
             <div class="symbol-btn" data-symbol="SOLUSDT">◎ SOL</div>
+            <div class="symbol-btn" data-symbol="XRPUSDT">✕ XRP</div>
+            <div class="symbol-btn" data-symbol="DOGEUSDT">Ð DOGE</div>
+            <div class="symbol-btn" data-symbol="DOTUSDT">• DOT</div>
+            <div class="symbol-btn" data-symbol="AVAXUSDT">▲ AVAX</div>
+            <div class="symbol-btn" data-symbol="SHIBUSDT">S SHIB</div>
         </div>
         <div class="menu-row">
             <label>Interval:</label>
@@ -157,32 +170,41 @@
             <div class="interval-btn" data-interval="2m">2m</div>
             <div class="interval-btn" data-interval="3m">3m</div>
             <div class="interval-btn" data-interval="5m">5m</div>
+            <div class="interval-btn" data-interval="10m">10m</div>
             <div class="interval-btn" data-interval="15m">15m</div>
+            <div class="interval-btn" data-interval="20m">20m</div>
             <div class="interval-btn" data-interval="30m">30m</div>
             <div class="interval-btn" data-interval="1h">1h</div>
             <div class="interval-btn" data-interval="2h">2h</div>
+            <div class="interval-btn" data-interval="3h">3h</div>
             <div class="interval-btn" data-interval="4h">4h</div>
             <div class="interval-btn" data-interval="6h">6h</div>
             <div class="interval-btn" data-interval="8h">8h</div>
             <div class="interval-btn" data-interval="12h">12h</div>
-            <div class="interval-btn active" data-interval="1d">1d</div>
+            <div class="interval-btn" data-interval="1d">1d</div>
             <div class="interval-btn" data-interval="2d">2d</div>
             <div class="interval-btn" data-interval="3d">3d</div>
             <div class="interval-btn" data-interval="1w">1w</div>
             <div class="interval-btn" data-interval="1M">1M</div>
+            <div class="interval-btn" data-interval="2M">2M</div>
+            <div class="interval-btn" data-interval="3M">3M</div>
+            <div class="interval-btn" data-interval="4M">4M</div>
+            <div class="interval-btn" data-interval="6M">6M</div>
+            <div class="interval-btn" data-interval="1Y">1Y</div> <!-- ДОБАВЛЕНО -->
         </div>
         <div class="menu-row">
             <label>A:</label>
             <input type="number" id="analysisLimit" value="10000" min="500" max="20000" step="500">
             <label>D:</label>
-            <input type="number" id="displayLimit" value="500" min="10" max="1000" step="10">
+            <input type="number" id="displayLimit" value="24" min="10" max="1000" step="1">
             <label>EMA:</label>
-            <input type="number" id="emaPeriod" value="96" min="10" max="500" step="10">
+            <input type="number" id="emaPeriod" value="48" min="10" max="500" step="1">
             <label>W:</label>
-            <input type="number" id="derivWindow" value="4" min="2" max="20" step="1">
+            <input type="number" id="derivWindow" value="2" min="2" max="20" step="1">
             <label>Upd:</label>
             <input type="number" id="updateInterval" value="5000" min="1000" max="300000" step="1000">
             <button id="applyBtn">Apply</button>
+            <button id="resetBtn">Reset</button>
         </div>
     </div>
     <div class="chart-title" id="chartTitle">
@@ -199,15 +221,22 @@
         <div>Use Wheel to Zoom</div>
     </div>
     <script>
-        const config = {
+        const defaultConfig = {
             symbol: 'BTCUSDT',
-            interval: '1d',
+            interval: '5m',
             analysisLimit: 10000,
-            displayLimit: 500,
-            emaPeriod: 96,
-            derivWindow: 4,
+            displayLimit: 24,
+            emaPeriod: 48,
+            derivWindow: 2,
             updateIntervalMs: 5000,
             markerOffsetPx: 10
+        };
+
+        const config = { ...defaultConfig };
+
+        const precisionMap = {
+            'BTCUSDT': 2, 'ETHUSDT': 2, 'BNBUSDT': 2, 'ADAUSDT': 3, 'SOLUSDT': 2,
+            'XRPUSDT': 4, 'DOGEUSDT': 5, 'DOTUSDT': 3, 'AVAXUSDT': 2, 'SHIBUSDT': 8
         };
 
         let fullCandleData = [];
@@ -220,7 +249,6 @@
         const chartTitleText = document.getElementById('chartTitleText');
         const mainHeader = document.getElementById('mainHeader');
         const toggleMenuBtn = document.getElementById('toggleMenuBtn');
-
         const symbolButtons = document.querySelectorAll('.symbol-btn');
         const intervalButtons = document.querySelectorAll('.interval-btn');
         const analysisLimitInput = document.getElementById('analysisLimit');
@@ -229,9 +257,11 @@
         const derivWindowInput = document.getElementById('derivWindow');
         const updateIntervalInput = document.getElementById('updateInterval');
         const applyBtn = document.getElementById('applyBtn');
+        const resetBtn = document.getElementById('resetBtn');
         const lastUpdatedDiv = document.getElementById('lastUpdated');
 
         let menuCollapsed = false;
+
         toggleMenuBtn.addEventListener('click', () => {
             menuCollapsed = !menuCollapsed;
             mainHeader.classList.toggle('collapsed', menuCollapsed);
@@ -239,10 +269,8 @@
             setTimeout(updateDisplay, 150);
         });
 
-        // ... остальной код без изменений до drawAdaptiveTimeGrid ...
-
         const Database = {
-            dbName: 'sigma_candles_v11',
+            dbName: 'sigma_candles_v14',
             initDB: () => {
                 if (!localStorage.getItem(this.dbName)) {
                     localStorage.setItem(this.dbName, JSON.stringify({}));
@@ -273,12 +301,12 @@
         Database.initDB();
 
         const SettingsManager = {
-            key: 'sigma_ta_settings_v11',
+            key: 'sigma_ta_settings_v14',
             load: () => {
                 try {
                     return JSON.parse(localStorage.getItem(this.key)) || config;
                 } catch {
-                    return {...config};
+                    return { ...config };
                 }
             },
             save: () => {
@@ -289,6 +317,84 @@
                 }
             }
         };
+
+        // === АГРЕГАЦИЯ ===
+        function getBaseInterval(target) {
+            if (['2m'].includes(target)) return '1m';
+            if (['10m', '20m'].includes(target)) return '5m';
+            if (['3h'].includes(target)) return '1h';
+            if (['2d'].includes(target)) return '1d';
+            if (['2M', '4M'].includes(target)) return '1M';
+            if (['3M', '6M', '1Y'].includes(target)) return '1M';
+            return target;
+        }
+
+        function aggregateCandles(candles, targetInterval) {
+            const base = getBaseInterval(targetInterval);
+            if (base === targetInterval || !candles.length) return candles;
+
+            const simpleRules = {
+                '2m': { step: 2 },
+                '10m': { step: 2 },
+                '20m': { step: 4 },
+                '3h': { step: 3 },
+                '2d': { step: 2 },
+                '2M': { step: 2 },
+                '4M': { step: 4 }
+            };
+
+            if (simpleRules[targetInterval]) {
+                const { step } = simpleRules[targetInterval];
+                const agg = [];
+                for (let i = 0; i <= candles.length - step; i += step) {
+                    const chunk = candles.slice(i, i + step);
+                    const open = chunk[0].open;
+                    const close = chunk[chunk.length - 1].close;
+                    const high = Math.max(...chunk.map(c => c.high));
+                    const low = Math.min(...chunk.map(c => c.low));
+                    const time = chunk[0].time;
+                    agg.push({ time, open, high, low, close });
+                }
+                return agg;
+            }
+
+            // Календарные: 3M, 6M, 1Y
+            const groups = {};
+            for (const c of candles) {
+                const d = new Date(c.time);
+                let key, groupTime;
+                if (targetInterval === '3M') {
+                    const q = Math.floor(d.getUTCMonth() / 3);
+                    key = `${d.getUTCFullYear()}-Q${q}`;
+                    groupTime = Date.UTC(d.getUTCFullYear(), q * 3, 1);
+                } else if (targetInterval === '6M') {
+                    const h = d.getUTCMonth() < 6 ? 0 : 1;
+                    key = `${d.getUTCFullYear()}-H${h}`;
+                    groupTime = Date.UTC(d.getUTCFullYear(), h * 6, 1);
+                } else if (targetInterval === '1Y') {
+                    const y = d.getUTCFullYear();
+                    key = `Y${y}`;
+                    groupTime = Date.UTC(y, 0, 1);
+                } else {
+                    continue;
+                }
+                if (!groups[key]) groups[key] = { time: groupTime, candles: [] };
+                groups[key].candles.push(c);
+            }
+
+            const result = [];
+            for (const g of Object.values(groups)) {
+                const chunk = g.candles;
+                if (!chunk.length) continue;
+                const open = chunk[0].open;
+                const close = chunk[chunk.length - 1].close;
+                const high = Math.max(...chunk.map(c => c.high));
+                const low = Math.min(...chunk.map(c => c.low));
+                result.push({ time: g.time, open, high, low, close });
+            }
+            result.sort((a, b) => a.time - b.time);
+            return result;
+        }
 
         function init() {
             loadSettings();
@@ -328,8 +434,21 @@
                 });
             });
             applyBtn.addEventListener('click', applySettings);
-            const inputs = [analysisLimitInput, displayLimitInput, emaPeriodInput, derivWindowInput, updateIntervalInput];
-            inputs.forEach(el => el.addEventListener('change', applySettings));
+            resetBtn.addEventListener('click', resetSettings);
+            [analysisLimitInput, displayLimitInput, emaPeriodInput, derivWindowInput, updateIntervalInput]
+                .forEach(el => el.addEventListener('change', applySettings));
+        }
+
+        function resetSettings() {
+            Object.assign(config, defaultConfig);
+            analysisLimitInput.value = config.analysisLimit;
+            displayLimitInput.value = config.displayLimit;
+            emaPeriodInput.value = config.emaPeriod;
+            derivWindowInput.value = config.derivWindow;
+            updateIntervalInput.value = config.updateIntervalMs;
+            SettingsManager.save();
+            updateButtonStates();
+            loadData();
         }
 
         function updateButtonStates() {
@@ -397,17 +516,28 @@
         }
 
         async function loadRealData() {
-            const url = `https://api.binance.com/api/v3/klines?symbol=${config.symbol}&interval=${config.interval}&limit=${config.analysisLimit}`;
+            const baseInt = getBaseInterval(config.interval);
+            let limit = config.analysisLimit;
+
+            const simpleRules = { '2m':2, '10m':2, '20m':4, '3h':3, '2d':2, '2M':2, '4M':4 };
+            if (simpleRules[config.interval]) {
+                limit = Math.min(1000, config.analysisLimit * simpleRules[config.interval]);
+            } else if (['3M','6M','1Y'].includes(config.interval)) {
+                limit = Math.min(1000, config.analysisLimit);
+            }
+
+            const url = `https://api.binance.com/api/v3/klines?symbol=${config.symbol}&interval=${baseInt}&limit=${limit}`;
             const res = await fetch(url);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const raw = await res.json();
-            fullCandleData = raw.map(item => ({
+            const baseCandles = raw.map(item => ({
                 time: item[0],
                 open: parseFloat(item[1]),
                 high: parseFloat(item[2]),
                 low: parseFloat(item[3]),
                 close: parseFloat(item[4])
             }));
+            fullCandleData = aggregateCandles(baseCandles, config.interval);
             updateStatus();
         }
 
@@ -424,12 +554,13 @@
                 const close = open * (1 + chg);
                 const high = Math.max(open, close) * (1 + Math.random() * 0.01);
                 const low = Math.min(open, close) * (1 - Math.random() * 0.01);
+                const prec = precisionMap[config.symbol] ?? 2;
                 fullCandleData.push({
                     time: t,
-                    open: parseFloat(open.toFixed(2)),
-                    high: parseFloat(high.toFixed(2)),
-                    low: parseFloat(low.toFixed(2)),
-                    close: parseFloat(close.toFixed(2))
+                    open: parseFloat(open.toFixed(prec)),
+                    high: parseFloat(high.toFixed(prec)),
+                    low: parseFloat(low.toFixed(prec)),
+                    close: parseFloat(close.toFixed(prec))
                 });
                 price = close;
                 t += sec * 1000;
@@ -438,19 +569,26 @@
         }
 
         function updateStatus() {
+            if (!fullCandleData.length) return;
             currentPrice = fullCandleData[fullCandleData.length - 1].close;
             lastUpdateTime = new Date();
             const up = fullCandleData.length > 1 && currentPrice >= fullCandleData[fullCandleData.length - 2].close;
             const color = up ? '#26a69a' : '#ef5350';
-            chartTitleText.innerHTML = `${config.symbol} (${config.interval}) &nbsp; <span style="color:${color}">$${currentPrice.toLocaleString()}</span>`;
+            const prec = precisionMap[config.symbol] ?? 2;
+            const formattedPrice = currentPrice.toLocaleString('en', {
+                minimumFractionDigits: prec,
+                maximumFractionDigits: prec
+            });
+            chartTitleText.innerHTML = `${config.symbol} (${config.interval}) &nbsp; <span style="color:${color}">$${formattedPrice}</span>`;
             lastUpdatedDiv.textContent = `Last Updated: ${formatTime(lastUpdateTime)}`;
         }
 
         function getIntervalSeconds(interval) {
             const map = {
-                '1m':60, '2m':120, '3m':180, '5m':300, '15m':900, '30m':1800,
-                '1h':3600, '2h':7200, '4h':14400, '6h':21600, '8h':28800, '12h':43200,
-                '1d':86400, '2d':172800, '3d':259200, '1w':604800, '1M':2592000
+                '1m':60, '2m':120, '3m':180, '5m':300, '10m':600, '15m':900, '20m':1200, '30m':1800,
+                '1h':3600, '2h':7200, '3h':10800, '4h':14400, '6h':21600, '8h':28800, '12h':43200,
+                '1d':86400, '2d':172800, '3d':259200, '1w':604800, '1M':2592000,
+                '2M':5184000, '3M':7776000, '4M':10368000, '6M':15552000, '1Y':31536000
             };
             return map[interval] || 3600;
         }
@@ -530,7 +668,23 @@
 
         function drawChart() {
             if (!fullCandleData.length) return;
-            const displayData = fullCandleData.slice(-config.displayLimit);
+
+            const extraCandles = 4;
+            const extendedData = [...fullCandleData];
+            const last = fullCandleData[fullCandleData.length - 1];
+            const sec = getIntervalSeconds(config.interval);
+            for (let i = 1; i <= extraCandles; i++) {
+                extendedData.push({
+                    time: last.time + i * sec * 1000,
+                    open: last.close,
+                    high: last.close,
+                    low: last.close,
+                    close: last.close
+                });
+            }
+
+            const total = config.displayLimit + extraCandles;
+            const displayData = extendedData.slice(-total).slice(0, -extraCandles);
             if (displayData.length === 0) return;
 
             const visibleTimes = new Set(displayData.map(d => d.time));
@@ -566,7 +720,7 @@
             drawAdaptiveTimeGrid(displayData, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH);
             drawCandles(displayData, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH);
             drawMarkers(visibleMarkers, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH);
-            drawLegendLeft(w, h, marginY);
+            drawLegendTop(w, h, marginY);
         }
 
         function drawPriceGrid(pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH) {
@@ -588,7 +742,12 @@
                 ctx.stroke();
                 ctx.fillStyle = '#AAA';
                 ctx.font = '10px Arial';
-                ctx.fillText(price.toLocaleString(), w - marginX + (w > 500 ? 10 : 2), y + 4);
+                const prec = precisionMap[config.symbol] ?? 2;
+                const formatted = price.toLocaleString('en', {
+                    minimumFractionDigits: Math.min(prec, 4),
+                    maximumFractionDigits: Math.min(prec, 4)
+                });
+                ctx.fillText(formatted, w - marginX + (w > 500 ? 10 : 2), y + 4);
             }
         }
 
@@ -607,65 +766,75 @@
             ctx.lineTo(w - marginX, y);
             ctx.stroke();
             ctx.fillStyle = color;
+            const prec = precisionMap[config.symbol] ?? 2;
+            const formatted = price.toLocaleString('en', {
+                minimumFractionDigits: prec,
+                maximumFractionDigits: prec
+            });
             ctx.font = 'bold 10px Arial';
-            ctx.fillText(`$${price.toLocaleString()}`, w - marginX + (w > 500 ? 10 : 2), y - 2);
+            ctx.fillText(`$${formatted}`, w - marginX + (w > 500 ? 10 : 2), y - 2);
         }
 
-        // === ИСПРАВЛЕНО: 1d → недели ===
         function drawAdaptiveTimeGrid(data, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH) {
             const interval = config.interval;
             let majorStepMs = 0;
             let formatLabel = (ts) => '';
 
-            if (['1m', '2m'].includes(interval)) {
-                // 1m, 2m → по часам
+            if (['1m','2m','3m','5m','10m','20m'].includes(interval)) {
                 majorStepMs = 3600 * 1000;
-                formatLabel = (ts) => {
-                    const d = new Date(ts);
-                    return `${d.getHours()}:00`;
-                };
-            } else if (['3m', '5m'].includes(interval)) {
-                // 3m, 5m → по часам
-                majorStepMs = 3600 * 1000;
-                formatLabel = (ts) => {
-                    const d = new Date(ts);
-                    return `${d.getHours()}:00`;
-                };
-            } else if (['15m', '30m', '1h'].includes(interval)) {
-                // 15m–1h → по суткам
+                formatLabel = (ts) => `${new Date(ts).getHours()}:00`;
+            } else if (['15m','30m','1h','2h','3h','4h','6h','8h','12h'].includes(interval)) {
                 majorStepMs = 86400 * 1000;
-                formatLabel = (ts) => {
-                    const d = new Date(ts);
-                    return `${d.getDate()}`;
-                };
-            } else if (['2h', '4h', '6h', '8h', '12h'].includes(interval)) {
-                // 2h–12h → по суткам
-                majorStepMs = 86400 * 1000;
-                formatLabel = (ts) => {
-                    const d = new Date(ts);
-                    return `${d.getDate()}`;
-                };
-            } else if (['1d', '2d', '3d'].includes(interval)) {
-                // 1d, 2d, 3d → по неделям
+                formatLabel = (ts) => `${new Date(ts).getDate()}`;
+            } else if (['1d','2d','3d'].includes(interval)) {
                 majorStepMs = 7 * 86400 * 1000;
-                formatLabel = (ts) => {
-                    const d = new Date(ts);
-                    return `${d.getMonth()+1}/${d.getDate()}`;
-                };
+                formatLabel = (ts) => `${new Date(ts).getMonth()+1}/${new Date(ts).getDate()}`;
             } else if (interval === '1w') {
-                // 1w → по месяцам
                 majorStepMs = 30.44 * 86400 * 1000;
-                formatLabel = (ts) => {
-                    const d = new Date(ts);
-                    return `${d.getMonth()+1}/${String(d.getFullYear()).slice(-2)}`;
-                };
-            } else if (interval === '1M') {
-                // 1M → по годам
+                formatLabel = (ts) => `${new Date(ts).getMonth()+1}/${String(new Date(ts).getFullYear()).slice(-2)}`;
+            } else if (['1M','2M','3M','4M','6M'].includes(interval)) {
                 majorStepMs = 365.25 * 86400 * 1000;
-                formatLabel = (ts) => {
-                    const d = new Date(ts);
-                    return `${d.getFullYear()}`;
-                };
+                formatLabel = (ts) => `${new Date(ts).getFullYear()}`;
+            } else if (interval === '1Y') {
+                // Годовой: деления каждые 4 года, начиная со следующего за високосным
+                const startYear = new Date(tMin).getUTCFullYear();
+                // Найти ближайший год ≥ startYear, следующий за високосным
+                let firstMarkYear = startYear;
+                while (true) {
+                    const prev = firstMarkYear - 1;
+                    if ((prev % 4 === 0 && prev % 100 !== 0) || (prev % 400 === 0)) {
+                        break;
+                    }
+                    firstMarkYear++;
+                    if (firstMarkYear > startYear + 10) {
+                        // fallback, если не нашли
+                        firstMarkYear = startYear + (4 - (startYear % 4));
+                        break;
+                    }
+                }
+                // Отображаем линии
+                const years = [];
+                for (let y = firstMarkYear; y <= new Date(tMin + timeRange).getUTCFullYear() + 4; y += 4) {
+                    const ts = Date.UTC(y, 0, 1);
+                    years.push(ts);
+                }
+                for (const ts of years) {
+                    const x = marginX + (ts - tMin) / timeRange * (w - 2 * marginX);
+                    if (x < marginX || x > w - marginX) continue;
+                    ctx.strokeStyle = '#555777';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([4, 4]);
+                    ctx.beginPath();
+                    ctx.moveTo(x, marginY);
+                    ctx.lineTo(x, h - marginY);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.fillStyle = '#888CCC';
+                    ctx.font = '10px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`${new Date(ts).getUTCFullYear()}`, x, h - 12);
+                }
+                return;
             } else {
                 majorStepMs = 86400 * 1000;
                 formatLabel = (ts) => `${new Date(ts).getDate()}`;
@@ -673,12 +842,10 @@
 
             const firstTs = tMin;
             let startMajor = Math.floor(firstTs / majorStepMs) * majorStepMs;
-
             for (let t = startMajor; t <= tMin + timeRange + majorStepMs; t += majorStepMs) {
                 if (t < tMin - majorStepMs || t > tMin + timeRange + majorStepMs) continue;
                 const x = marginX + (t - tMin) / timeRange * (w - 2 * marginX);
                 if (x < marginX || x > w - marginX) continue;
-
                 ctx.strokeStyle = '#555777';
                 ctx.lineWidth = 1;
                 ctx.setLineDash([4, 4]);
@@ -687,7 +854,6 @@
                 ctx.lineTo(x, h - marginY);
                 ctx.stroke();
                 ctx.setLineDash([]);
-
                 ctx.fillStyle = '#888CCC';
                 ctx.font = '10px Arial';
                 ctx.textAlign = 'center';
@@ -740,7 +906,7 @@
             }
         }
 
-        function drawLegendLeft(w, h, topY) {
+        function drawLegendTop(w, h, topY) {
             if (w < 400) return;
             const items = [
                 { color: '#FF00FF', text: 'Strong +' },
@@ -750,18 +916,19 @@
                 { color: '#0000FF', text: 'Moderate –' },
                 { color: '#FFFFFF', text: 'Weak –' }
             ];
-            const startX = 10;
-            const itemH = 20;
+            const totalWidth = items.reduce((sum, item) => sum + ctx.measureText(item.text).width + 30, 0);
+            const startX = w / 2 - totalWidth / 2;
             ctx.font = '11px Arial';
             ctx.textAlign = 'left';
+            let xOffset = startX;
             for (let i = 0; i < items.length; i++) {
-                const y = topY + i * itemH;
                 ctx.fillStyle = items[i].color;
                 ctx.beginPath();
-                ctx.arc(startX + 6, y + 6, 5, 0, Math.PI * 2);
+                ctx.arc(xOffset + 6, topY + 10, 4, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.fillStyle = '#FFF';
-                ctx.fillText(items[i].text, startX + 16, y + 10);
+                ctx.fillText(items[i].text, xOffset + 16, topY + 14);
+                xOffset += ctx.measureText(items[i].text).width + 22;
             }
         }
 
