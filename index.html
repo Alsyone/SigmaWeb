@@ -1047,7 +1047,9 @@
                 const y = m.isAbove ? yBase - config.markerOffsetPx : yBase + config.markerOffsetPx;
                 ctx.fillStyle = m.color;
                 ctx.beginPath();
-                ctx.arc(x, y, w > 400 ? 3 : 2, 0, 2 * Math.PI);
+				const baseRadius = w > 400 ? 3 : 2;
+				const radius = baseRadius * 0.5;
+				ctx.arc(x, y, radius, 0, 2 * Math.PI);
                 ctx.fill();
             }
         }
