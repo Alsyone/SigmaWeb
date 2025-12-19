@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>SigmaTA Web v1.0</title>
+    <title>SigmaTA Web v1.1</title>
     <style>
         * {
             margin: 0;
@@ -138,7 +138,7 @@
         .status-bar {
             background-color: #1a1a2e;
             padding: 4px 10px;
-            font-size: 11px;
+            font-size: 14px;
             color: #aaa;
             display: flex;
             justify-content: space-between;
@@ -247,7 +247,7 @@
 
         <div class="status-bar">
             <div id="lastUpdated">Last Updated: --:--:--</div>
-            <div>Use Wheel to Zoom</div>
+            <!-- <div>Use Wheel to Zoom</div> -->
             <div class="toggle-menu-btn" id="toggleFooterBtn">≡</div>
         </div>
 
@@ -285,11 +285,11 @@
     <div class="settings-popup" id="settingsPopup">
         <h3>Settings</h3>
         <div class="popup-row">
-            <label>A:</label>
+            <label>Analysis:</label>
             <input type="number" id="popupAnalysisLimit" value="10000" min="500" max="20000" step="500">
         </div>
         <div class="popup-row">
-            <label>D:</label>
+            <label>Display:</label>
             <input type="number" id="popupDisplayLimit" value="24" min="10" max="1000" step="1">
         </div>
         <div class="popup-row">
@@ -297,11 +297,11 @@
             <input type="number" id="popupEmaPeriod" value="48" min="10" max="500" step="1">
         </div>
         <div class="popup-row">
-            <label>W:</label>
+            <label>Window:</label>
             <input type="number" id="popupDerivWindow" value="2" min="2" max="20" step="1">
         </div>
         <div class="popup-row">
-            <label>Upd (ms):</label>
+            <label>UPD (ms):</label>
             <input type="number" id="popupUpdateInterval" value="5000" min="1000" max="300000" step="1000">
         </div>
         <div class="popup-row">
@@ -728,13 +728,13 @@
             currentPrice = fullCandleData[fullCandleData.length - 1].close;
             lastUpdateTime = new Date();
             const up = fullCandleData.length > 1 && currentPrice >= fullCandleData[fullCandleData.length - 2].close;
-            const color = up ? '#008000' : '#800000';
+            const color = up ? '#00ff00' : 'ff0000';
             const prec = precisionMap[config.symbol] ?? 2;
             const formattedPrice = currentPrice.toLocaleString('en', {
                 minimumFractionDigits: prec,
                 maximumFractionDigits: prec
             });
-            chartTitleText.innerHTML = `${config.symbol} (${config.interval}) &nbsp; <span style="color:${color}">$${formattedPrice}</span>`;
+            chartTitleText.innerHTML = `${config.symbol} (${config.interval}) &nbsp; <span style="color:${color}">${formattedPrice}</span>`;
             document.getElementById('lastUpdated').textContent = `Last Updated: ${formatTime(lastUpdateTime)}`;
         }
 
@@ -867,7 +867,7 @@
             drawAdaptiveTimeGrid(displayData, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH);
             drawCandles(displayData, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH);
             drawMarkers(visibleMarkers, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH);
-            drawLegendTop(w, h, marginY);
+			drawLegendLeft(w, h, marginX, marginY, drawH);
         }
 
         function drawPriceGrid(pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH) {
@@ -896,30 +896,6 @@
                 });
                 ctx.fillText(formatted, w - marginX + (w > 500 ? 10 : 2), y + 4);
             }
-        }
-
-        function drawCurrentPriceLine(price, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH) {
-            const y = marginY + (pMaxAdj - price) / priceRangeAdj * drawH;
-            if (y < marginY || y > h - marginY) return;
-            let color = '#00FFFF';
-            if (fullCandleData.length > 1) {
-                const prev = fullCandleData[fullCandleData.length - 2].close;
-                color = price >= prev ? '#00FF00' : '#FF0000';
-            }
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(marginX, y);
-            ctx.lineTo(w - marginX, y);
-            ctx.stroke();
-            ctx.fillStyle = color;
-            const prec = precisionMap[config.symbol] ?? 2;
-            const formatted = price.toLocaleString('en', {
-                minimumFractionDigits: prec,
-                maximumFractionDigits: prec
-            });
-            ctx.font = `bold ${config.fontSize || 11}px Arial`;
-            ctx.fillText(`${formatted}`, w - marginX + (w > 500 ? 10 : 2), y - 2);
         }
 
         function drawAdaptiveTimeGrid(displayData, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH) {
@@ -1040,6 +1016,30 @@
             }
         }
 
+        function drawCurrentPriceLine(price, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH) {
+            const y = marginY + (pMaxAdj - price) / priceRangeAdj * drawH;
+            if (y < marginY || y > h - marginY) return;
+            let color = '#00FFFF';
+            if (fullCandleData.length > 1) {
+                const prev = fullCandleData[fullCandleData.length - 2].close;
+                color = price >= prev ? '#00FF00' : '#FF0000';
+            }
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(marginX, y);
+            ctx.lineTo(w - marginX, y);
+            ctx.stroke();
+            ctx.fillStyle = color;
+            const prec = precisionMap[config.symbol] ?? 2;
+            const formatted = price.toLocaleString('en', {
+                minimumFractionDigits: prec,
+                maximumFractionDigits: prec
+            });
+            ctx.font = `bold ${config.fontSize || 11}px Arial`;
+            ctx.fillText(`${formatted}`, w - marginX + (w > 500 ? 10 : 2), y - 2);
+        }
+
         function drawMarkers(markers, tMin, timeRange, pMinAdj, pMaxAdj, priceRangeAdj, w, h, marginX, marginY, drawH) {
             for (const m of markers) {
                 const x = marginX + (m.time - tMin) / timeRange * (w - 2 * marginX);
@@ -1052,31 +1052,29 @@
             }
         }
 
-        function drawLegendTop(w, h, topY) {
-            if (w < 400) return;
-            const items = [
-                { color: '#FF00FF', text: 'Strong +' },
-                { color: '#FF0000', text: 'Moderate +' },
-                { color: '#FFFF00', text: 'Weak +' },
-                { color: '#00FFFF', text: 'Strong –' },
-                { color: '#0000FF', text: 'Moderate –' },
-                { color: '#FFFFFF', text: 'Weak –' }
-            ];
-            const totalWidth = items.reduce((sum, item) => sum + ctx.measureText(item.text).width + 30, 0);
-            const startX = w / 2 - totalWidth / 2;
-            ctx.font = `${config.fontSize || 11}px Arial`;
-            ctx.textAlign = 'left';
-            let xOffset = startX;
-            for (let i = 0; i < items.length; i++) {
-                ctx.fillStyle = items[i].color;
-                ctx.beginPath();
-                ctx.arc(xOffset + 6, topY + 10, 4, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#FFF';
-                ctx.fillText(items[i].text, xOffset + 16, topY + 14);
-                xOffset += ctx.measureText(items[i].text).width + 22;
-            }
-        }
+		function drawLegendLeft(w, h, marginX, marginY, drawH) {
+			if (w < 400) return;
+			const items = [
+				{ color: '#FF00FF', text: '+ High' },
+				{ color: '#FF0000', text: '+ Mid' },
+				{ color: '#FFFF00', text: '+ Low' },
+				{ color: '#00FFFF', text: ' - High' },
+				{ color: '#0000FF', text: ' - Mid' },
+				{ color: '#FFFFFF', text: ' - Low' }
+			];
+			const legendTop = marginY + drawH / 2 - (items.length * 16) / 2;
+			ctx.font = `${config.fontSize || 11}px Arial`;
+			ctx.textAlign = 'left';
+			for (let i = 0; i < items.length; i++) {
+				const y = legendTop + i * 16;
+				ctx.fillStyle = items[i].color;
+				ctx.beginPath();
+				ctx.arc(marginX - 12-50, y, 4, 0, Math.PI * 2);
+				ctx.fill();
+				ctx.fillStyle = '#FFF';
+				ctx.fillText(items[i].text, marginX + 2-60, y + 4);
+			}
+		}
 
         window.onload = init;
     </script>
